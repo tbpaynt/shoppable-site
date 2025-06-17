@@ -7,6 +7,8 @@ export type Product = {
   retail: number;
   countdown: Date;
   published: boolean;
+  stock: number;
+  description: string;
 };
 
 export const products: Product[] = [
@@ -19,6 +21,8 @@ export const products: Product[] = [
     retail: 39.99,
     countdown: new Date(Date.now() + 1000 * 60 * 60 * 2),
     published: false,
+    stock: 10,
+    description: "A cool impulse gadget.",
   },
   {
     id: 2,
@@ -29,6 +33,8 @@ export const products: Product[] = [
     retail: 24.99,
     countdown: new Date(Date.now() + 1000 * 60 * 30),
     published: false,
+    stock: 5,
+    description: "A handy quick buy widget.",
   },
   {
     id: 3,
@@ -39,5 +45,7 @@ export const products: Product[] = [
     retail: 29.99,
     countdown: new Date(Date.now() + 1000 * 60 * 10),
     published: false,
+    stock: 0,
+    description: "A must-have flash sale thing.",
   },
 ];
