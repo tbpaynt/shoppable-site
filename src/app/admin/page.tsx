@@ -56,16 +56,15 @@ export default function AdminPage() {
     const fetchProducts = async () => {
       setLoading(true);
       const res = await fetch("/api/products");
-      let data;
       try {
-        data = await res.json();
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          setProductList([]);
+        } else {
+          setProductList(data);
+        }
       } catch {
-        data = [];
-      }
-      if (!Array.isArray(data)) {
         setProductList([]);
-      } else {
-        setProductList(data);
       }
       setLoading(false);
     };

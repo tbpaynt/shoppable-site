@@ -250,7 +250,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
     return (
       <div className="bg-white bg-opacity-5 p-6 rounded-lg">
         <h2 className="text-2xl font-bold text-white mb-4">Purchase History</h2>
-        <p className="text-gray-300">You haven't made any purchases yet.</p>
+        <p className="text-gray-300">You haven&apos;t made any purchases yet.</p>
       </div>
     );
   }
