@@ -102,7 +102,7 @@ export default function AdminPage() {
         const file = imageFiles[i];
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${i}.${fileExt}`;
-        const { data, error } = await supabase
+        const { error } = await supabase
           .storage
           .from('product-images')
           .upload(fileName, file);

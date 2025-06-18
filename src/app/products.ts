@@ -9,6 +9,7 @@ export type Product = {
   published: boolean;
   stock: number;
   description: string;
+  category_id?: number;
 };
 
 export const products: Product[] = [
