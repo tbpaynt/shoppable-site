@@ -7,6 +7,21 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+type Order = {
+  id: string;
+  created_at: string;
+  order_items: { id: string; name: string; price: number; quantity: number }[];
+  tracking_info?: {
+    tracking_number?: string;
+    delivered?: boolean;
+    out_for_delivery?: boolean;
+    in_transit?: boolean;
+    shipped?: boolean;
+    shipped_at?: string;
+  };
+  shipping_carrier?: { name: string; estimated_days?: number };
+};
+
 export default function CustomerPanel() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,7 +131,7 @@ function AuthForm() {
 }
 
 function PurchaseHistory({ userId }: { userId: string }) {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [notificationPreferences, setNotificationPreferences] = useState<{[key: string]: boolean}>({});
@@ -140,7 +155,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
           .eq('user_id', userId);
 
         if (prefs) {
-          const prefsMap = prefs.reduce((acc: any, pref: any) => {
+          const prefsMap = prefs.reduce((acc: Record<string, boolean>, pref: { order_id: string, email_notifications: boolean }) => {
             acc[pref.order_id] = pref.email_notifications;
             return acc;
           }, {});
@@ -196,14 +211,13 @@ function PurchaseHistory({ userId }: { userId: string }) {
     }
   };
 
-  const getEstimatedDeliveryDate = (order: any) => {
-    if (!order.tracking_info?.shipped_at) return null;
-    
-    const shippedDate = new Date(order.tracking_info.shipped_at);
+  const getEstimatedDeliveryDate = (order: Order) => {
+    const shippedAt = order.tracking_info?.shipped_at;
+    if (!shippedAt || typeof shippedAt !== "string") return null;
+    const shippedDate = new Date(shippedAt);
     const estimatedDays = order.shipping_carrier?.estimated_days || 5;
     const deliveryDate = new Date(shippedDate);
     deliveryDate.setDate(deliveryDate.getDate() + estimatedDays);
-    
     return deliveryDate;
   };
 
@@ -329,7 +343,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
                         {order.tracking_info.delivered && (
                           <div className="flex items-center gap-2 text-green-400">
                             <span>✓</span>
-                            <span>Delivered on {new Date(order.tracking_info.delivered_at).toLocaleDateString()}</span>
+                            <span>Delivered</span>
                           </div>
                         )}
                         {order.tracking_info.out_for_delivery && (

@@ -23,17 +23,17 @@ export default function AdminPage() {
   const { data: session, status } = useSession();
   const [productList, setProductList] = useState<Product[]>([]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [newProduct, setNewProduct] = useState<any>({
+  const [newProduct, setNewProduct] = useState<Omit<Product, 'id'> & { category_id?: string }>({
     listing_number: "",
     name: "",
     image: "",
     price: 0,
     retail: 0,
     countdown: new Date(Date.now() + 1000 * 60 * 60),
-    category_id: "",
     stock: 0,
     description: "",
     published: false,
+    category_id: "",
   });
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -59,7 +59,7 @@ export default function AdminPage() {
       let data;
       try {
         data = await res.json();
-      } catch (e) {
+      } catch {
         data = [];
       }
       if (!Array.isArray(data)) {
@@ -129,7 +129,7 @@ export default function AdminPage() {
         await supabase.from('product_images').insert({ product_id: created.id, image_url: url });
       }
       setProductList([...productList, created]);
-      setNewProduct({ listing_number: "", name: "", image: "", price: 0, retail: 0, countdown: new Date(Date.now() + 1000 * 60 * 60), category_id: "", stock: 0, description: "", published: false });
+      setNewProduct({ listing_number: "", name: "", image: "", price: 0, retail: 0, countdown: new Date(Date.now() + 1000 * 60 * 60), stock: 0, description: "", published: false, category_id: "" });
       setImageFiles([]);
       setShowAddForm(false);
     }

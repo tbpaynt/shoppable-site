@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useCart } from '../../app/CartContext';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from "react";
-import { CountdownTimer } from "../components/CountdownTimer";
+import type { Product } from '../products';
 
 function formatCountdown(diffMs: number) {
   let totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
@@ -17,9 +17,9 @@ function formatCountdown(diffMs: number) {
 }
 
 export default function ProductListPage({}) {
-  const { cart, addToCart } = useCart();
+  const { addToCart } = useCart();
   const router = useRouter();
-  const [products, setProducts] = React.useState<any[]>([]);
+  const [products, setProducts] = React.useState<Product[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
 

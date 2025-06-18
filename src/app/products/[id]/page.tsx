@@ -3,14 +3,15 @@ import React, { useEffect, useState } from "react";
 import { useCart } from '../../CartContext';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '../../../utils/supabaseClient';
+import type { Product } from '../../products';
 
 export default function ProductDetailPage() {
   const { id } = useParams();
   const { addToCart } = useCart();
   const router = useRouter();
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<Product | null>(null);
   const [categoryName, setCategoryName] = useState("");
-  const [images, setImages] = useState<any[]>([]);
+  const [images, setImages] = useState<{ image_url: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
