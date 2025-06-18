@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useCart } from "./CartContext";
 import type { Product } from "./products";
 import { CountdownTimer } from "./components/CountdownTimer";
+import Image from 'next/image';
 
 export default function StorePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -74,9 +75,11 @@ export default function StorePage() {
             {products.filter(product => product.published).map(product => (
               <div key={product.id} className="bg-gray-800 rounded-lg shadow-md overflow-hidden">
                 <div className="aspect-w-1 aspect-h-1 w-full">
-                  <img
+                  <Image
                     src={product.image}
                     alt={product.name}
+                    width={400}
+                    height={192}
                     className="w-full h-48 object-cover"
                   />
                 </div>

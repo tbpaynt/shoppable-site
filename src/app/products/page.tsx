@@ -4,6 +4,7 @@ import { useCart } from '../../app/CartContext';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from "react";
 import type { Product } from '../products';
+import Image from 'next/image';
 
 function formatCountdown(diffMs: number) {
   let totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
@@ -88,7 +89,7 @@ export default function ProductListPage({}) {
             {publishedProducts.map(product => (
               <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-4 text-gray-900">
                 <Link href={`/products/${product.id}`}>
-                  <img src={product.image} alt={product.name} className="h-48 w-full object-cover rounded mb-4" />
+                  <Image src={product.image} alt={product.name} width={400} height={192} className="h-48 w-full object-cover rounded mb-4" />
                   <div className="font-semibold text-lg mb-1">{product.name}</div>
                   <div className="mb-1 text-gray-600">Listing #: {product.listing_number}</div>
                   <div className="mb-1 text-gray-600">Stock: {product.stock ?? 0}</div>

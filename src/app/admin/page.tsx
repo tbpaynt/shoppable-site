@@ -3,6 +3,7 @@ import { useSession, signIn } from "next-auth/react";
 import { useState, useEffect } from "react";
 import type { Product } from "../products";
 import { supabase } from "../../utils/supabaseClient";
+import Image from 'next/image';
 
 // Robust helper to format UTC string to local datetime-local input value
 function utcToLocalInputValue(utcString: string) {
@@ -233,7 +234,7 @@ export default function AdminPage() {
               <td className="p-2">{getCategoryName(product.category_id)}</td>
               <td className="p-2">
                 {product.image && (
-                  <img src={product.image} alt={product.name} className="h-16 w-16 object-cover rounded" />
+                  <Image src={product.image} alt={product.name} width={64} height={64} className="h-16 w-16 object-cover rounded" />
                 )}
               </td>
               <td className="p-2">{product.name}</td>
@@ -266,7 +267,7 @@ export default function AdminPage() {
           {imageFiles.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2">
               {imageFiles.map((file, idx) => (
-                <img key={idx} src={URL.createObjectURL(file)} alt={`Preview ${idx + 1}`} className="h-24" />
+                <Image key={idx} src={URL.createObjectURL(file)} alt={`Preview ${idx + 1}`} width={96} height={96} className="h-24" />
               ))}
             </div>
           )}

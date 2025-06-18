@@ -4,6 +4,7 @@ import { useCart } from '../../CartContext';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '../../../utils/supabaseClient';
 import type { Product } from '../../products';
+import Image from 'next/image';
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -54,11 +55,11 @@ export default function ProductDetailPage() {
       <div className="mb-2 text-gray-600">Listing #: {product.listing_number}</div>
       <div className="mb-2 text-gray-600">Category: {categoryName}</div>
       <div className="mb-4 flex gap-4">
-        <img src={product.image} alt={product.name} className="h-64 w-64 object-cover rounded border" />
+        <Image src={product.image} alt={product.name} width={256} height={256} className="h-64 w-64 object-cover rounded border" />
         {images && images.length > 0 && (
           <div className="flex flex-col gap-2">
             {images.map((img, idx) => (
-              <img key={idx} src={img.image_url} alt={`Product image ${idx + 2}`} className="h-20 w-20 object-cover rounded border" />
+              <Image key={idx} src={img.image_url} alt={`Product image ${idx + 2}`} width={80} height={80} className="h-20 w-20 object-cover rounded border" />
             ))}
           </div>
         )}

@@ -1,6 +1,7 @@
 "use client";
 import { useCart } from '../CartContext';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
@@ -27,7 +28,7 @@ export default function CartPage() {
             <tbody>
               {cart.map(item => (
                 <tr key={item.id} className="border-t border-gray-200">
-                  <td className="p-2"><img src={item.image} alt={item.name} className="h-12 w-12 object-cover rounded" /></td>
+                  <td className="p-2"><Image src={item.image} alt={item.name} width={48} height={48} className="h-12 w-12 object-cover rounded" /></td>
                   <td className="p-2">{item.name}</td>
                   <td className="p-2">${item.price.toFixed(2)}</td>
                   <td className="p-2">

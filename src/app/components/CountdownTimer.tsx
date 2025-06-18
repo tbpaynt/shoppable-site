@@ -6,9 +6,6 @@ interface CountdownTimerProps {
 }
 
 export function CountdownTimer({ endDate }: CountdownTimerProps) {
-  // Always use a Date object
-  const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
-
   const [timeLeft, setTimeLeft] = useState({
     hours: 0,
     minutes: 0,
@@ -17,6 +14,7 @@ export function CountdownTimer({ endDate }: CountdownTimerProps) {
   });
 
   useEffect(() => {
+    const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
     const calculateTimeLeft = () => {
       const difference = end.getTime() - new Date().getTime();
       if (difference <= 0) {
@@ -39,7 +37,7 @@ export function CountdownTimer({ endDate }: CountdownTimerProps) {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
     return () => clearInterval(timer);
-  }, [end]);
+  }, [endDate]);
 
   if (timeLeft.isExpired) {
     return (
