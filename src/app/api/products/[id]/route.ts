@@ -8,16 +8,15 @@ const supabase = createClient(
 );
 
 export async function PUT(
-  request: NextRequest,
-  context: { params: { id: string } }
+  request: Request,
+  params: { params: { id: string } }
 ) {
-  const { params } = context;
   try {
     const product = await request.json();
     const { data, error } = await supabase
       .from("products")
       .update(product)
-      .eq("id", params.id)
+      .eq("id", params.params.id)
       .select()
       .single();
 
@@ -30,15 +29,14 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  context: { params: { id: string } }
+  request: Request,
+  params: { params: { id: string } }
 ) {
-  const { params } = context;
   try {
     const { error } = await supabase
       .from("products")
       .delete()
-      .eq("id", params.id);
+      .eq("id", params.params.id);
 
     if (error) throw error;
     return NextResponse.json({ success: true });
