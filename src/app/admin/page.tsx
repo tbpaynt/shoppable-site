@@ -24,18 +24,20 @@ export default function AdminPage() {
   const { data: session, status } = useSession();
   const [productList, setProductList] = useState<Product[]>([]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [newProduct, setNewProduct] = useState<Omit<Product, 'id'> & { category_id?: string }>({
-    listing_number: "",
-    name: "",
-    image: "",
-    price: 0,
-    retail: 0,
-    countdown: new Date(Date.now() + 1000 * 60 * 60),
-    stock: 0,
-    description: "",
-    published: false,
-    category_id: "",
-  });
+  const [newProduct, setNewProduct] = useState<Omit<Product, 'id'> & { category_id?: number }>(
+    {
+      listing_number: "",
+      name: "",
+      image: "",
+      price: 0,
+      retail: 0,
+      countdown: new Date(Date.now() + 1000 * 60 * 60),
+      stock: 0,
+      description: "",
+      published: false,
+      category_id: undefined,
+    }
+  );
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -129,7 +131,7 @@ export default function AdminPage() {
         await supabase.from('product_images').insert({ product_id: created.id, image_url: url });
       }
       setProductList([...productList, created]);
-      setNewProduct({ listing_number: "", name: "", image: "", price: 0, retail: 0, countdown: new Date(Date.now() + 1000 * 60 * 60), stock: 0, description: "", published: false, category_id: "" });
+      setNewProduct({ listing_number: "", name: "", image: "", price: 0, retail: 0, countdown: new Date(Date.now() + 1000 * 60 * 60), stock: 0, description: "", published: false, category_id: undefined });
       setImageFiles([]);
       setShowAddForm(false);
     }
@@ -231,7 +233,7 @@ export default function AdminPage() {
             <tr key={product.id} className="border-t border-gray-700">
               <td className="p-2">{product.id}</td>
               <td className="p-2">{product.listing_number}</td>
-              <td className="p-2">{getCategoryName(product.category_id)}</td>
+              <td className="p-2">{typeof product.category_id === 'number' ? getCategoryName(product.category_id) : ''}</td>
               <td className="p-2">
                 {product.image && (
                   <Image src={product.image} alt={product.name} width={64} height={64} className="h-16 w-16 object-cover rounded" />
@@ -256,7 +258,7 @@ export default function AdminPage() {
           <h3 className="text-lg mb-2">Add New Product</h3>
           <input type="text" placeholder="Listing Number" className="mb-2 p-1 w-full text-black" value={newProduct.listing_number || ""} onChange={e => setNewProduct({ ...newProduct, listing_number: e.target.value })} required />
           <input type="text" placeholder="Name" className="mb-2 p-1 w-full text-black" value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} required />
-          <select className="mb-2 p-1 w-full text-black" value={newProduct.category_id} onChange={e => setNewProduct({ ...newProduct, category_id: e.target.value })} required>
+          <select className="mb-2 p-1 w-full text-black" value={newProduct.category_id ?? ""} onChange={e => setNewProduct({ ...newProduct, category_id: e.target.value ? Number(e.target.value) : undefined })} required>
             <option value="">Select Category</option>
             {categories.map(cat => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
