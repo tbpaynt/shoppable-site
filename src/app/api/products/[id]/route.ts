@@ -8,14 +8,14 @@ const supabase = createClient(
 
 export async function PUT(
   request: Request,
-  params: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const product = await request.json();
     const { data, error } = await supabase
       .from("products")
       .update(product)
-      .eq("id", params.params.id)
+      .eq("id", params.id)
       .select()
       .single();
 
@@ -29,13 +29,13 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  params: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const { error } = await supabase
       .from("products")
       .delete()
-      .eq("id", params.params.id);
+      .eq("id", params.id);
 
     if (error) throw error;
     return NextResponse.json({ success: true });
