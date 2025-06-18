@@ -6,41 +6,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const product = await request.json();
-    const { data, error } = await supabase
-      .from("products")
-      .update(product)
-      .eq("id", params.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error("Error updating product:", error);
-    return NextResponse.json({ error: "Error updating product" }, { status: 500 });
-  }
+export async function PUT(request, { params }) {
+  return new Response('ok');
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", params.id);
-
-    if (error) throw error;
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting product:", error);
-    return NextResponse.json({ error: "Error deleting product" }, { status: 500 });
-  }
+export async function DELETE(request, { params }) {
+  return new Response('ok');
 } 
