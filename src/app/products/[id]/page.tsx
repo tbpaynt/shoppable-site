@@ -7,7 +7,8 @@ import type { Product } from '../../products';
 import Image from 'next/image';
 
 export default function ProductDetailPage() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = params && typeof params.id === 'string' ? params.id : '';
   const { addToCart } = useCart();
   const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
