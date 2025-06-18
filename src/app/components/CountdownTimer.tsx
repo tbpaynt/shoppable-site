@@ -39,7 +39,7 @@ export function CountdownTimer({ endDate }: CountdownTimerProps) {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
     return () => clearInterval(timer);
-  }, [endDate]);
+  }, [end]);
 
   if (timeLeft.isExpired) {
     return (

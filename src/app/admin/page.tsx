@@ -95,7 +95,7 @@ export default function AdminPage() {
     e.preventDefault();
     setLoading(true);
     let imageUrl = newProduct.image;
-    let additionalImageUrls: string[] = [];
+    const additionalImageUrls: string[] = [];
     // Upload all images if files are selected
     if (imageFiles.length > 0) {
       for (let i = 0; i < imageFiles.length; i++) {

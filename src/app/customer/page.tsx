@@ -75,7 +75,7 @@ function AuthForm() {
   const [error, setError] = useState("");
   const [view, setView] = useState("sign-in");
 
-  const handleAuth = async (e: any) => {
+  const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError("");
@@ -171,7 +171,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
     fetchOrders();
   }, [userId]);
 
-  const getTrackingStatus = (order: any) => {
+  const getTrackingStatus = (order: Order) => {
     if (!order.tracking_info) return 'Not Shipped';
     if (order.tracking_info.delivered) return 'Delivered';
     if (order.tracking_info.out_for_delivery) return 'Out for Delivery';
@@ -191,12 +191,10 @@ function PurchaseHistory({ userId }: { userId: string }) {
     }
   };
 
-  const getTrackingUrl = (order: any) => {
+  const getTrackingUrl = (order: Order) => {
     if (!order.tracking_info?.tracking_number || !order.shipping_carrier) return null;
-    
     const trackingNumber = order.tracking_info.tracking_number;
     const carrier = order.shipping_carrier.name.toLowerCase();
-    
     switch (carrier) {
       case 'ups':
         return `https://www.ups.com/track?tracknum=${trackingNumber}`;
@@ -275,33 +273,31 @@ function PurchaseHistory({ userId }: { userId: string }) {
               </div>
               
               {/* Order Status and Tracking */}
-              <div className="mb-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`${statusColor} font-semibold`}>Status: {status}</span>
-                  {order.tracking_info?.tracking_number && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-sm">
-                        Tracking: {order.tracking_info.tracking_number}
-                      </span>
-                      {trackingUrl && (
-                        <a
-                          href={trackingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300 text-sm"
-                        >
-                          Track on {order.shipping_carrier?.name || 'Carrier'} →
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {estimatedDelivery && !order.tracking_info?.delivered && (
-                  <div className="text-gray-400 text-sm mt-1">
-                    Estimated Delivery: {estimatedDelivery.toLocaleDateString()}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`${statusColor} font-semibold`}>Status: {status}</span>
+                {order.tracking_info?.tracking_number && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 text-sm">
+                      Tracking: {order.tracking_info.tracking_number}
+                    </span>
+                    {trackingUrl && (
+                      <a
+                        href={trackingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 text-sm"
+                      >
+                        Track on {order.shipping_carrier?.name || 'Carrier'} &rarr;
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
+              {estimatedDelivery && !order.tracking_info?.delivered && (
+                <div className="text-gray-400 text-sm mt-1">
+                  Estimated Delivery: {estimatedDelivery.toLocaleDateString()}
+                </div>
+              )}
 
               {/* Email Notifications Toggle */}
               <div className="mb-3">
@@ -327,7 +323,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
               {expandedOrder === order.id && (
                 <>
                   <div className="space-y-2 mb-3">
-                    {order.order_items.map((item: any) => (
+                    {order.order_items.map((item) => (
                       <div key={item.id} className="flex justify-between items-center text-gray-300">
                         <span>{item.name}</span>
                         <span>${item.price.toFixed(2)} x {item.quantity}</span>
@@ -336,48 +332,46 @@ function PurchaseHistory({ userId }: { userId: string }) {
                   </div>
 
                   {/* Tracking Timeline */}
-                  {order.tracking_info && (
-                    <div className="mt-4 pt-4 border-t border-gray-600">
-                      <h3 className="text-white font-semibold mb-2">Tracking Timeline</h3>
-                      <div className="space-y-2">
-                        {order.tracking_info.delivered && (
-                          <div className="flex items-center gap-2 text-green-400">
-                            <span>✓</span>
-                            <span>Delivered</span>
-                          </div>
-                        )}
-                        {order.tracking_info.out_for_delivery && (
-                          <div className="flex items-center gap-2 text-yellow-400">
-                            <span>→</span>
-                            <span>Out for delivery</span>
-                          </div>
-                        )}
-                        {order.tracking_info.in_transit && (
-                          <div className="flex items-center gap-2 text-blue-400">
-                            <span>→</span>
-                            <span>In transit</span>
-                          </div>
-                        )}
-                        {order.tracking_info.shipped && (
-                          <div className="flex items-center gap-2 text-blue-400">
-                            <span>→</span>
-                            <span>Shipped on {new Date(order.tracking_info.shipped_at).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 text-gray-400">
-                          <span>→</span>
-                          <span>Order placed on {new Date(order.created_at).toLocaleDateString()}</span>
+                  <div className="mt-4 pt-4 border-t border-gray-600">
+                    <h3 className="text-white font-semibold mb-2">Tracking Timeline</h3>
+                    <div className="space-y-2">
+                      {order.tracking_info?.delivered && (
+                        <div className="flex items-center gap-2 text-green-400">
+                          <span>&#10003;</span>
+                          <span>Delivered</span>
                         </div>
+                      )}
+                      {order.tracking_info?.out_for_delivery && (
+                        <div className="flex items-center gap-2 text-yellow-400">
+                          <span>&rarr;</span>
+                          <span>Out for delivery</span>
+                        </div>
+                      )}
+                      {order.tracking_info?.in_transit && (
+                        <div className="flex items-center gap-2 text-blue-400">
+                          <span>&rarr;</span>
+                          <span>In transit</span>
+                        </div>
+                      )}
+                      {order.tracking_info?.shipped && (
+                        <div className="flex items-center gap-2 text-blue-400">
+                          <span>&rarr;</span>
+                          <span>Shipped on {order.tracking_info?.shipped_at ? new Date(order.tracking_info.shipped_at).toLocaleDateString() : ''}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <span>&rarr;</span>
+                        <span>Order placed on {new Date(order.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </>
               )}
 
               <div className="mt-2 pt-2 border-t border-gray-600">
                 <div className="flex justify-between items-center text-white font-bold">
                   <span>Total</span>
-                  <span>${order.order_items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0).toFixed(2)}</span>
+                  <span>${order.order_items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}</span>
                 </div>
               </div>
             </div>

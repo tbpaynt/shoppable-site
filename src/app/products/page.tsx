@@ -83,7 +83,7 @@ export default function ProductListPage({}) {
       {!isBeforeGoLive && (
         <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
           <h1 className="text-4xl font-extrabold mb-2 text-center">WE ARE LIVE</h1>
-          <div className="text-xl mb-8 text-center italic">Don't let a good deal get by!!!</div>
+          <div className="text-xl mb-8 text-center italic">Don&apos;t let a good deal get by!!!</div>
           <div className="max-w-5xl w-full px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             {publishedProducts.map(product => (
               <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-4 text-gray-900">
