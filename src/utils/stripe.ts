@@ -1,5 +1,8 @@
 import Stripe from 'stripe';
 
+// Add this line for debugging Vercel deployment
+console.log('Build-time STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY ? 'Exists' : 'Does NOT exist');
+
 // Server-side Stripe instance
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-05-28.basil',
