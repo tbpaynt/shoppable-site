@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '../../../../utils/stripe';
+import { getStripeServer } from '../../../../utils/stripe';
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
@@ -19,6 +19,7 @@ interface OrderItem {
 }
 
 export async function POST(request: NextRequest) {
+  const stripe = getStripeServer();
   const body = await request.text();
   const headersList = await headers();
   const sig = headersList.get('stripe-signature');

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '../../../utils/stripe';
+import { getStripeServer } from '../../../utils/stripe';
 
 interface CartItem {
   id: number;
@@ -9,6 +9,7 @@ interface CartItem {
 }
 
 export async function POST(request: NextRequest) {
+  const stripe = getStripeServer();
   try {
     const { items, customerEmail }: { items: CartItem[]; customerEmail: string } = await request.json();
 
