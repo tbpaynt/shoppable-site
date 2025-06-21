@@ -89,7 +89,7 @@ function AuthForm() {
     setLoading(false);
   };
 
-  const handleOAuth = async (provider: "google" | "facebook") => {
+  const handleOAuth = async (provider: "google") => {
     setLoading(true);
     setError("");
     const { error } = await supabase.auth.signInWithOAuth({ provider });
@@ -124,7 +124,6 @@ function AuthForm() {
       </div>
       <div className="flex flex-col gap-2 mt-2 w-full">
         <button type="button" className="bg-red-500 text-white px-4 py-2 rounded font-bold w-full" onClick={() => handleOAuth("google")}>Continue with Google</button>
-        <button type="button" className="bg-blue-800 text-white px-4 py-2 rounded font-bold w-full" onClick={() => handleOAuth("facebook")}>Continue with Facebook</button>
       </div>
     </form>
   );

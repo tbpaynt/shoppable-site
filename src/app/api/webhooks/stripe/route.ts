@@ -123,6 +123,19 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
       console.error('Error updating stock for product:', item.id, stockError);
     }
   }
+  
+  // Create a corresponding tracking_info record to kick off the shipping process
+  const { error: trackingError } = await supabase
+    .from('tracking_info')
+    .insert({
+      order_id: order.id,
+      status: 'processing' // Initial status
+    });
+
+  if (trackingError) {
+    // Log the error but don't fail the webhook, as the payment was successful.
+    console.error(`Failed to create tracking_info for order ${order.id}:`, trackingError);
+  }
 
   console.log(`Payment succeeded for order ${order.id}`);
 }
