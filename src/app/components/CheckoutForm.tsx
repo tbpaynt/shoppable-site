@@ -8,6 +8,7 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 
+console.log('Stripe publishable key:', process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 interface CheckoutFormProps {
@@ -21,6 +22,9 @@ function CheckoutFormContent({ onSuccess, onError }: Omit<CheckoutFormProps, 'cl
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState('');
+  
+  console.log('Stripe instance:', stripe);
+  console.log('Elements instance:', elements);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
