@@ -1,9 +1,10 @@
 "use client";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function SuccessPage() {
+function SuccessContent() {
   const params = useSearchParams();
   const orderId = params ? params.get("orderId") : null;
 
@@ -25,5 +26,13 @@ export default function SuccessPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense>
+      <SuccessContent />
+    </Suspense>
   );
 } 
