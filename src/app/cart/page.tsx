@@ -2,7 +2,7 @@
 import { useCart } from '../CartContext';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CheckoutForm from '../components/CheckoutForm';
 
 export default function CartPage() {
@@ -11,8 +11,67 @@ export default function CartPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
   
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // Address state for shipping quote
+  const [address, setAddress] = useState({
+    name: "",
+    street1: "",
+    city: "",
+    state: "",
+    zip: "",
+  });
+  const [shippingQuote, setShippingQuote] = useState<number | null>(null);
+  const [shippingRateId, setShippingRateId] = useState<string | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
+  const TAX_RATE = 0.06; // 6% sales tax – adjust per locale
+
+  // Trigger quote when cart or address changes
+  useEffect(() => {
+    const ready = address.street1 && address.city && address.state && address.zip && cart.length > 0;
+    if (!ready) return;
+    const fetchQuote = async () => {
+      setQuoteLoading(true);
+      setQuoteError(null);
+      try {
+        const payload = {
+          items: cart.map((c) => ({ id: c.id, quantity: c.quantity })),
+          address: {
+            street1: address.street1,
+            city: address.city,
+            state: address.state,
+            zip: address.zip,
+            country: "US",
+          },
+        };
+        const res = await fetch("/api/shipping/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Quote failed");
+        setShippingQuote(data.amount);
+        setShippingRateId(data.rateId);
+      } catch (e: any) {
+        setQuoteError(e.message || "Quote failed");
+        setShippingQuote(null);
+        setShippingRateId(null);
+      } finally {
+        setQuoteLoading(false);
+      }
+    };
+    fetchQuote();
+  }, [cart, address.street1, address.city, address.state, address.zip]);
+
+  const productTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // Use dynamic quote if available else per-item shipping cost fallback
+  const shippingTotal = shippingQuote !== null ? shippingQuote : cart.reduce((sum, item) => sum + (item.shipping_cost || 0) * item.quantity, 0);
+  const taxableBase = productTotal + shippingTotal;
+  const taxTotal = +(taxableBase * TAX_RATE).toFixed(2);
+  const total = productTotal + shippingTotal + taxTotal;
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
@@ -21,24 +80,58 @@ export default function CartPage() {
     setError(null);
 
     try {
+      const payload: any = {
+        items: cart.map(item => ({ id: item.id, quantity: item.quantity })),
+      };
+      if (shippingQuote !== null && shippingRateId) {
+        payload.shipAmount = shippingQuote;
+        payload.rateId = shippingRateId;
+        payload.address = {
+          street1: address.street1,
+          city: address.city,
+          state: address.state,
+          zip: address.zip,
+          country: "US",
+        };
+        payload.taxAmount = taxTotal;
+      }
+
       const response = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          items: cart,
-          customerEmail: 'customer@example.com', // You can make this dynamic based on user login
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      // If the API responds with an error status, extract message safely
+      if (!response.ok) {
+        const clone = response.clone();
+        let message = response.statusText;
+        try {
+          const errJson = await response.json();
+          if (errJson && typeof errJson.error === 'string') {
+            message = errJson.error;
+          }
+        } catch {
+          // maybe body isn't JSON; try plain text from clone
+          try {
+            message = await clone.text();
+          } catch {
+            /* ignore */
+          }
+        }
+        throw new Error(message || 'Failed to initialize checkout');
+      }
 
-      if (data.error) {
-        throw new Error(data.error);
+      // Happy path
+      const data = await response.json();
+      if (!data?.clientSecret) {
+        throw new Error('Payment initialisation failed: missing clientSecret');
       }
 
       setClientSecret(data.clientSecret);
+      setOrderId(data.orderId ?? null);
       setShowCheckout(true);
     } catch (err: unknown) {
       const error = err as Error;
@@ -52,8 +145,12 @@ export default function CartPage() {
     clearCart();
     setShowCheckout(false);
     setClientSecret(null);
-    // You can redirect to a success page or show a success message
-    alert('Payment successful! Your order has been placed.');
+
+    // Navigate to success / thank-you page
+    if (typeof window !== 'undefined') {
+      const dest = orderId ? `/success?orderId=${orderId}` : '/success';
+      window.location.assign(dest);
+    }
   };
 
   const handlePaymentError = (errorMessage: string) => {
@@ -75,8 +172,20 @@ export default function CartPage() {
                 <span>${(item.price * item.quantity).toFixed(2)}</span>
               </div>
             ))}
-            <div className="border-t pt-2 font-bold">
-              <div className="flex justify-between">
+            <div className="border-t pt-2 font-bold space-y-1">
+              <div className="flex justify-between text-sm font-normal">
+                <span>Items Subtotal</span>
+                <span>${productTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-normal">
+                <span>Shipping</span>
+                <span>${shippingTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-normal">
+                <span>Tax (6%)</span>
+                <span>${taxTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-lg">
                 <span>Total:</span>
                 <span>${total.toFixed(2)}</span>
               </div>
@@ -109,6 +218,39 @@ export default function CartPage() {
         <div className="text-gray-500 mb-8">Your cart is empty. <Link href="/products" className="text-blue-600 underline">Shop now</Link></div>
       ) : (
         <>
+          {/* Shipping address */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="Street Address"
+              value={address.street1}
+              onChange={(e) => setAddress({ ...address, street1: e.target.value })}
+              className="p-2 border rounded text-black"
+            />
+            <input
+              type="text"
+              placeholder="City"
+              value={address.city}
+              onChange={(e) => setAddress({ ...address, city: e.target.value })}
+              className="p-2 border rounded text-black"
+            />
+            <input
+              type="text"
+              placeholder="State (e.g. WV)"
+              value={address.state}
+              onChange={(e) => setAddress({ ...address, state: e.target.value.toUpperCase() })}
+              className="p-2 border rounded text-black"
+            />
+            <input
+              type="text"
+              placeholder="ZIP"
+              value={address.zip}
+              onChange={(e) => setAddress({ ...address, zip: e.target.value })}
+              className="p-2 border rounded text-black"
+            />
+            {quoteLoading && <span className="text-white">Calculating shipping…</span>}
+            {quoteError && <span className="text-red-400">{quoteError}</span>}
+          </div>
           <table className="w-full mb-6">
             <thead>
               <tr>

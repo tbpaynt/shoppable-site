@@ -5,6 +5,8 @@ export type Product = {
   image: string;
   price: number;
   retail: number;
+  shipping_cost?: number;
+  weight_oz?: number;
   countdown: Date;
   published: boolean;
   stock: number;

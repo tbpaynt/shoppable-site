@@ -72,8 +72,8 @@ export default function ProductDetailPage() {
       <div className="mb-4">Stock: {product.stock ?? 0}</div>
       <div className="mb-6 whitespace-pre-line">{product.description}</div>
       <div className="flex gap-4 mt-6">
-        <button className="bg-blue-600 text-white px-6 py-2 rounded text-lg font-semibold" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price })}>Add to Cart</button>
-        <button className="bg-green-600 text-white px-6 py-2 rounded text-lg font-semibold" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price }); router.push('/cart'); }}>Buy</button>
+        <button className="bg-blue-600 text-white px-6 py-2 rounded text-lg font-semibold" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })}>Add to Cart</button>
+        <button className="bg-green-600 text-white px-6 py-2 rounded text-lg font-semibold" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }}>Buy</button>
       </div>
     </div>
   );

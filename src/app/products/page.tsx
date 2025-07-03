@@ -103,8 +103,8 @@ export default function ProductListPage({}) {
                   )}
                 </Link>
                 <div className="flex gap-2 mt-4">
-                  <button className="bg-blue-600 text-white px-3 py-1 rounded disabled:opacity-50" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price })} disabled={product.stock === 0}>Add to Cart</button>
-                  <button className="bg-green-600 text-white px-3 py-1 rounded disabled:opacity-50" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price }); router.push('/cart'); }} disabled={product.stock === 0}>Buy</button>
+                  <button className="bg-blue-600 text-white px-3 py-1 rounded disabled:opacity-50" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })} disabled={product.stock === 0}>Add to Cart</button>
+                  <button className="bg-green-600 text-white px-3 py-1 rounded disabled:opacity-50" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }} disabled={product.stock === 0}>Buy</button>
                 </div>
               </div>
             ))}

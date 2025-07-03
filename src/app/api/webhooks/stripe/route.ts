@@ -3,6 +3,7 @@ import { getStripeServer } from '../../../../utils/stripe';
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
+import { purchaseLabel, createShippoOrder } from '../../../../utils/shippo';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,9 +55,17 @@ export async function POST(request: NextRequest) {
 }
 
 async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
-  const { customerEmail, items } = paymentIntent.metadata;
+  const {
+    orderId,
+    userEmail,
+    items,
+    shippo_rate_id,
+    ship_cost,
+    tax_amount,
+    address_to,
+  } = paymentIntent.metadata as any;
   
-  if (!customerEmail || !items) {
+  if (!userEmail || !items || !orderId) {
     console.error('Missing required metadata in payment intent');
     return;
   }
@@ -64,42 +73,25 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   // Parse items from metadata
   const orderItems: OrderItem[] = JSON.parse(items);
   
-  // Create or get user
-  let { data: user } = await supabase
-    .from('users')
-    .select('id')
-    .eq('email', customerEmail)
-    .single();
-
-  if (!user) {
-    // Create new user if doesn't exist
-    const { data: newUser, error: userError } = await supabase
-      .from('users')
-      .insert({ email: customerEmail })
-      .select('id')
-      .single();
-    
-    if (userError) throw userError;
-    user = newUser;
-  }
-
-  // Create order
-  const { data: order, error: orderError } = await supabase
+  // Insert order record
+  const { error: orderErr } = await supabase
     .from('orders')
     .insert({
-      user_id: user.id,
-      stripe_payment_intent_id: paymentIntent.id,
-      total_amount: paymentIntent.amount / 100, // Convert from cents
-      status: 'paid'
-    })
-    .select('id')
-    .single();
-
-  if (orderError) throw orderError;
+      id: orderId,
+      user_email: userEmail,
+      total_amount: paymentIntent.amount / 100,
+      ship_cost: ship_cost ? Number(ship_cost) : null,
+      tax_amount: tax_amount ? Number(tax_amount) : null,
+      status: 'paid',
+      address_to: address_to ? JSON.parse(address_to) : null,
+    });
+  if (orderErr) {
+    console.error('Insert order error', orderErr);
+  }
 
   // Create order items
   const orderItemsData = orderItems.map((item: OrderItem) => ({
-    order_id: order.id,
+    order_id: orderId,
     product_id: item.id,
     name: item.name,
     price: item.price,
@@ -112,32 +104,77 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 
   if (itemsError) throw itemsError;
 
-  // Update product stock
-  for (const item of orderItems) {
-    const { error: stockError } = await supabase
-      .from('products')
-      .update({ stock: supabase.rpc('decrement_stock', { product_id: item.id, quantity: item.quantity }) })
-      .eq('id', item.id);
+  // Fetch all needed product info in a single query (stock + weight)
+  const { data: productsData, error: productsErr } = await supabase
+    .from('products')
+    .select('id, stock, weight_oz')
+    .in('id', orderItems.map((it) => it.id));
 
-    if (stockError) {
-      console.error('Error updating stock for product:', item.id, stockError);
+  if (productsErr) {
+    console.error('Error fetching products data', productsErr);
+  }
+
+  const productMap = new Map<number, { stock: number | null; weight_oz: number | null }>();
+  (productsData || []).forEach((p) => productMap.set(p.id, { stock: p.stock, weight_oz: p.weight_oz }));
+
+  for (const item of orderItems) {
+    const prodInfo = productMap.get(item.id);
+    const currentStock = prodInfo?.stock ?? null;
+    if (currentStock !== null) {
+      const newStock = Math.max(currentStock - item.quantity, 0);
+      const { error: stockError } = await supabase
+        .from('products')
+        .update({ stock: newStock })
+        .eq('id', item.id);
+
+      if (stockError) {
+        console.error('Error updating stock for product:', item.id, stockError);
+      }
     }
   }
-  
-  // Create a corresponding tracking_info record to kick off the shipping process
-  const { error: trackingError } = await supabase
-    .from('tracking_info')
-    .insert({
-      order_id: order.id,
-      status: 'processing' // Initial status
-    });
 
-  if (trackingError) {
-    // Log the error but don't fail the webhook, as the payment was successful.
-    console.error(`Failed to create tracking_info for order ${order.id}:`, trackingError);
+  // Create Shippo order so it shows up in Shippo dashboard
+  try {
+    if (address_to) {
+      const lineItems = orderItems.map((item) => {
+        const prodInfo = productMap.get(item.id);
+        return {
+          title: item.name,
+          quantity: item.quantity,
+          total_price: item.price.toFixed(2),
+          currency: 'USD',
+          weight: prodInfo?.weight_oz ?? undefined,
+          weight_unit: prodInfo?.weight_oz ? 'oz' : undefined,
+        } as any;
+      });
+
+      await createShippoOrder({
+        orderNumber: orderId.toString(),
+        addressTo: JSON.parse(address_to),
+        lineItems,
+        totalPrice: paymentIntent.amount / 100,
+        shippingCost: ship_cost ? Number(ship_cost) : undefined,
+        taxAmount: tax_amount ? Number(tax_amount) : undefined,
+      });
+    }
+  } catch (e) {
+    console.error('Failed to create Shippo order', e);
   }
 
-  console.log(`Payment succeeded for order ${order.id}`);
+  // Purchase label if rate id present
+  if (shippo_rate_id) {
+    try {
+      const label = await purchaseLabel(shippo_rate_id);
+      await supabase
+        .from('orders')
+        .update({ tracking_number: label.trackingNumber, label_url: label.labelUrl })
+        .eq('id', orderId);
+    } catch (e) {
+      console.error('Shippo purchase failed', e);
+    }
+  }
+
+  console.log(`Payment succeeded for order ${orderId}`);
 }
 
 async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {

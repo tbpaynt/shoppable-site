@@ -98,7 +98,8 @@ export default function StorePage() {
                       id: product.id,
                       name: product.name,
                       image: product.image,
-                      price: product.price
+                      price: product.price,
+                      shipping_cost: product.shipping_cost ?? 0
                     })}
                     className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
                   >

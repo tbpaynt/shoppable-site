@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createClient, User } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import { useSession, signIn } from "next-auth/react";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,113 +24,40 @@ type Order = {
 };
 
 export default function CustomerPanel() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: session, status } = useSession();
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-      setLoading(false);
-    };
-    getUser();
-    const { data: listener } = supabase.auth.onAuthStateChange(() => getUser());
-    return () => { listener?.subscription.unsubscribe(); };
-  }, []);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-  };
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-2xl" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)', color: 'white'}}>Loading...</div>;
-
-  if (!user) {
+  if (status === "loading") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'}}>
-        <div className="bg-gray-800 p-8 rounded shadow max-w-md w-full flex flex-col items-center">
-          <h1 className="text-3xl font-extrabold mb-6 text-center text-white drop-shadow-lg" style={{letterSpacing: '0.05em'}}>Customer Login</h1>
-          <AuthForm />
-        </div>
+      <div className="min-h-screen flex items-center justify-center text-2xl" style={{ background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)', color: 'white' }}>
+        Loading...
+      </div>
+    );
+  }
+
+  if (status !== "authenticated" || !session.user?.email) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center" style={{ background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)', color: 'white' }}>
+        <h1 className="text-3xl font-bold mb-4">Please sign in to view your orders</h1>
+        <button onClick={() => signIn("google") } className="bg-blue-600 px-4 py-2 rounded">
+          Sign in with Google
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'}}>
-      <div className="bg-white bg-opacity-10 p-8 rounded shadow max-w-4xl w-full flex flex-col items-center">
-        <h1 className="text-3xl font-extrabold mb-4 text-center text-white drop-shadow-lg">Welcome, {user.email}!</h1>
+    <div className="min-h-screen flex flex-col items-center justify-center" style={{ background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)' }}>
+      <div className="bg-gray-800 p-8 rounded shadow max-w-4xl w-full flex flex-col items-center text-white">
+        <h1 className="text-3xl font-extrabold mb-4 text-center text-white drop-shadow-lg">Welcome, {session.user.email}!</h1>
         <div className="w-full">
-          <PurchaseHistory userId={user.id} />
+          <PurchaseHistory userEmail={session.user.email} />
         </div>
-        <button onClick={handleSignOut} className="bg-red-600 text-white px-4 py-2 rounded w-full font-bold mt-4">Sign Out</button>
       </div>
     </div>
   );
 }
 
-function AuthForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [view, setView] = useState("sign-in");
-
-  const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    if (view === "sign-in") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) setError(error.message);
-    }
-    setLoading(false);
-  };
-
-  const handleOAuth = async (provider: "google") => {
-    setLoading(true);
-    setError("");
-    const { error } = await supabase.auth.signInWithOAuth({ provider });
-    if (error) setError(error.message);
-    setLoading(false);
-  };
-
-  return (
-    <form onSubmit={handleAuth} className="flex flex-col gap-4 w-full items-center">
-      <input
-        type="email"
-        placeholder="Email"
-        className="p-2 border rounded w-full bg-white bg-opacity-80 text-black font-semibold"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        required
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        className="p-2 border rounded w-full bg-white bg-opacity-80 text-black font-semibold"
-        value={password}
-        onChange={e => setPassword(e.target.value)}
-        required
-      />
-      {error && <div className="text-red-300 text-sm w-full text-center">{error}</div>}
-      <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded w-full font-bold" disabled={loading}>
-        {loading ? (view === "sign-in" ? "Signing In..." : "Signing Up...") : (view === "sign-in" ? "Sign In" : "Sign Up")}
-      </button>
-      <div className="flex gap-2 justify-center w-full">
-        <button type="button" className="text-blue-200 underline text-sm" onClick={() => setView(view === "sign-in" ? "sign-up" : "sign-in")}>{view === "sign-in" ? "Create an account" : "Already have an account? Sign in"}</button>
-      </div>
-      <div className="flex flex-col gap-2 mt-2 w-full">
-        <button type="button" className="bg-red-500 text-white px-4 py-2 rounded font-bold w-full" onClick={() => handleOAuth("google")}>Continue with Google</button>
-      </div>
-    </form>
-  );
-}
-
-function PurchaseHistory({ userId }: { userId: string }) {
+function PurchaseHistory({ userEmail }: { userEmail: string }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
@@ -140,8 +68,8 @@ function PurchaseHistory({ userId }: { userId: string }) {
       try {
         const { data, error } = await supabase
           .from('orders')
-          .select('*, order_items(*), tracking_info(*), shipping_carrier(*)')
-          .eq('user_id', userId)
+          .select('id, created_at, total_amount, status, tracking_number, label_url, order_items(id, name, price, quantity)')
+          .eq('user_email', userEmail)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -150,8 +78,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
         // Fetch notification preferences
         const { data: prefs } = await supabase
           .from('notification_preferences')
-          .select('order_id, email_notifications')
-          .eq('user_id', userId);
+          .select('order_id, email_notifications');
 
         if (prefs) {
           const prefsMap = prefs.reduce((acc: Record<string, boolean>, pref: { order_id: string, email_notifications: boolean }) => {
@@ -168,7 +95,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
     };
 
     fetchOrders();
-  }, [userId]);
+  }, [userEmail]);
 
   const getTrackingStatus = (order: Order) => {
     if (!order.tracking_info) return 'Not Shipped';
@@ -225,7 +152,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
       const { error } = await supabase
         .from('notification_preferences')
         .upsert({
-          user_id: userId,
+          user_email: userEmail,
           order_id: orderId,
           email_notifications: newValue
         });
@@ -255,7 +182,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="bg-white bg-opacity-5 p-6 rounded-lg">
+    <div className="bg-gray-800 p-8 rounded shadow max-w-4xl w-full flex flex-col items-center text-white">
       <h2 className="text-2xl font-bold text-white mb-4">Purchase History</h2>
       <div className="space-y-4">
         {orders.map((order) => {
@@ -265,7 +192,7 @@ function PurchaseHistory({ userId }: { userId: string }) {
           const estimatedDelivery = getEstimatedDeliveryDate(order);
           
           return (
-            <div key={order.id} className="bg-white bg-opacity-10 p-4 rounded-lg">
+            <div key={order.id} className="bg-gray-800 p-4 rounded-lg text-white border border-gray-700">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-white font-semibold">Order #{order.id}</span>
                 <span className="text-gray-300">{new Date(order.created_at).toLocaleDateString()}</span>

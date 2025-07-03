@@ -33,7 +33,9 @@ export default function AdminPage() {
       retail: 0,
       countdown: new Date(Date.now() + 1000 * 60 * 60),
       stock: 0,
+      weight_oz: 0,
       description: "",
+      shipping_cost: 0,
       published: false,
       category_id: undefined,
     }
@@ -44,6 +46,22 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string>("");
   const [goLiveLoading, setGoLiveLoading] = useState(false);
+
+  // Admin panel view management
+  type AdminView = 'products' | 'orders';
+  const [view, setView] = useState<AdminView>('products');
+
+  // Orders state
+  type OrderSummary = {
+    id: string;
+    created_at: string;
+    total_amount: number;
+    status: string;
+    user_email?: string | null;
+    order_items: { id: string; name: string; quantity: number; price: number }[];
+  };
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   // Fetch categories from Supabase
   useEffect(() => {
@@ -85,6 +103,24 @@ export default function AdminPage() {
     };
     fetchGoLive();
   }, []);
+
+  // Fetch orders whenever view switches to 'orders'
+  useEffect(() => {
+    if (view !== 'orders') return;
+    const fetchOrders = async () => {
+      setOrdersLoading(true);
+      try {
+        const res = await fetch('/api/orders');
+        const data = await res.json();
+        setOrders(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error('Error fetching orders', e);
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+    fetchOrders();
+  }, [view]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -131,7 +167,7 @@ export default function AdminPage() {
         await supabase.from('product_images').insert({ product_id: created.id, image_url: url });
       }
       setProductList([...productList, created]);
-      setNewProduct({ listing_number: "", name: "", image: "", price: 0, retail: 0, countdown: new Date(Date.now() + 1000 * 60 * 60), stock: 0, description: "", published: false, category_id: undefined });
+      setNewProduct({ listing_number: "", name: "", image: "", price: 0, retail: 0, countdown: new Date(Date.now() + 1000 * 60 * 60), stock: 0, weight_oz: 0, description: "", shipping_cost: 0, published: false, category_id: undefined });
       setImageFiles([]);
       setShowAddForm(false);
     }
@@ -182,11 +218,71 @@ export default function AdminPage() {
 
   // UI logic (after hooks)
   if (status === "loading") return <div>Loading...</div>;
-  if (!session) {
+  if (status === "unauthenticated") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
         <h1 className="text-2xl mb-4">Admin Access Required</h1>
-        <button onClick={() => signIn()} className="bg-blue-600 px-4 py-2 rounded">Sign in</button>
+        <button onClick={() => signIn('google')} className="bg-blue-600 px-4 py-2 rounded">Sign in with Google</button>
+      </div>
+    );
+  }
+
+  if (session?.user?.role !== 'admin') {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
+            <h1 className="text-2xl mb-4">Access Denied</h1>
+            <p>You do not have permission to view this page.</p>
+        </div>
+    )
+  }
+
+  // Render ORDERS view separately for clarity
+  if (view === 'orders') {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <h1 className="text-3xl font-bold mb-6">Admin Dashboard – Orders</h1>
+        <div className="mb-6">
+          <label className="mr-2 font-semibold">Select view:</label>
+          <select
+            value={view}
+            onChange={(e) => setView(e.target.value as AdminView)}
+            className="p-2 rounded text-black"
+          >
+            <option value="products">Products</option>
+            <option value="orders">Orders</option>
+          </select>
+        </div>
+
+        {ordersLoading ? (
+          <div>Loading orders...</div>
+        ) : (
+          <table className="w-full mb-8">
+            <thead>
+              <tr>
+                <th className="text-left p-2">Order ID</th>
+                <th className="text-left p-2">Date</th>
+                <th className="text-left p-2">Customer</th>
+                <th className="text-left p-2">Total</th>
+                <th className="text-left p-2">Status</th>
+                <th className="text-left p-2">Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id} className="border-t border-gray-700">
+                  <td className="p-2 font-mono">{order.id}</td>
+                  <td className="p-2">{new Date(order.created_at).toLocaleString()}</td>
+                  <td className="p-2">{order.user_email ?? 'N/A'}</td>
+                  <td className="p-2">${order.total_amount.toFixed(2)}</td>
+                  <td className="p-2">{order.status}</td>
+                  <td className="p-2">
+                    {order.order_items.map((it) => `${it.name} x${it.quantity}`).join(', ')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     );
   }
@@ -194,8 +290,27 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
-      <h2 className="text-xl mb-4">Product List</h2>
-      {loading && <div className="mb-4">Loading...</div>}
+
+      {/* View selector */}
+      <div className="mb-8">
+        <label className="mr-2 font-semibold">Select view:</label>
+        <select
+          value={view}
+          onChange={(e) => setView(e.target.value as AdminView)}
+          className="p-2 rounded text-black"
+        >
+          <option value="products">Products</option>
+          <option value="orders">Orders</option>
+        </select>
+      </div>
+
+      {/* PRODUCT MANAGEMENT */}
+      {view === 'products' && (
+        <>
+          <h2 className="text-xl mb-4">Product List</h2>
+          {loading && <div className="mb-4">Loading...</div>}
+        </>
+      )}
       <div className="mb-8 bg-gray-800 p-4 rounded flex items-center gap-4">
         <label className="text-lg font-semibold mr-2">Storefront Go Live Time:</label>
         <input
@@ -223,6 +338,8 @@ export default function AdminPage() {
             <th className="text-left p-2">Name</th>
             <th className="text-left p-2">Price</th>
             <th className="text-left p-2">Retail</th>
+            <th className="text-left p-2">Shipping</th>
+            <th className="text-left p-2">Weight</th>
             <th className="text-left p-2">Stock</th>
             <th className="text-left p-2">Published</th>
             <th className="text-left p-2">Actions</th>
@@ -242,6 +359,8 @@ export default function AdminPage() {
               <td className="p-2">{product.name}</td>
               <td className="p-2">${product.price.toFixed(2)}</td>
               <td className="p-2">${product.retail.toFixed(2)}</td>
+              <td className="p-2">${(product.shipping_cost ?? 0).toFixed(2)}</td>
+              <td className="p-2">{product.weight_oz ?? 0}</td>
               <td className="p-2">{product.stock ?? 0}</td>
               <td className="p-2">{product.published ? 'Yes' : 'No'}</td>
               <td className="p-2">
@@ -302,6 +421,54 @@ export default function AdminPage() {
               required
             />
           </div>
+          <div className="mb-2 flex items-center">
+            <label className="mr-2 w-20">Shipping</label>
+            <span className="text-black bg-gray-200 px-2 py-1 rounded-l">$</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              className="p-1 w-full text-black rounded-r"
+              value={newProduct.shipping_cost}
+              onChange={e => setNewProduct({ ...newProduct, shipping_cost: parseFloat(e.target.value) || 0 })}
+              required
+            />
+          </div>
+          <div className="mb-2 flex items-center gap-2">
+            <label className="mr-2 w-20">Weight</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="lbs"
+              className="p-1 w-24 text-black rounded"
+              value={Math.floor(((newProduct.weight_oz ?? 0) / 16))}
+              onChange={e => {
+                const lbs = parseInt(e.target.value) || 0;
+                const oz = (newProduct.weight_oz ?? 0) % 16;
+                setNewProduct({ ...newProduct, weight_oz: lbs * 16 + oz });
+              }}
+              required
+            />
+            <span className="text-gray-300">lbs</span>
+            <input
+              type="number"
+              min="0"
+              max="15.9"
+              step="0.1"
+              placeholder="oz"
+              className="p-1 w-24 text-black rounded"
+              value={(((newProduct.weight_oz ?? 0) % 16).toFixed(1))}
+              onChange={e => {
+                const oz = parseFloat(e.target.value) || 0;
+                const lbs = Math.floor((newProduct.weight_oz ?? 0) / 16);
+                setNewProduct({ ...newProduct, weight_oz: lbs * 16 + oz });
+              }}
+              required
+            />
+            <span className="text-gray-300">oz</span>
+          </div>
           <input type="number" placeholder="Stock" className="mb-2 p-1 w-full text-black" value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) || 0 })} required />
           <input type="datetime-local" className="mb-2 p-1 w-full text-black" value={new Date(newProduct.countdown).toISOString().slice(0,16)} onChange={e => setNewProduct({ ...newProduct, countdown: new Date(e.target.value) })} required />
           <input type="checkbox" className="mb-2 mr-2" checked={newProduct.published} onChange={e => setNewProduct({ ...newProduct, published: e.target.checked })} />
@@ -322,6 +489,43 @@ export default function AdminPage() {
           <input type="text" placeholder="Image URL" className="mb-2 p-1 w-full text-black" value={editingProduct?.image || ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, image: e.target.value })} required />
           <input type="number" placeholder="Price" className="mb-2 p-1 w-full text-black" value={editingProduct?.price ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })} required />
           <input type="number" placeholder="Retail" className="mb-2 p-1 w-full text-black" value={editingProduct?.retail ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, retail: parseFloat(e.target.value) || 0 })} required />
+          <input type="number" placeholder="Shipping" className="mb-2 p-1 w-full text-black" value={editingProduct?.shipping_cost ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, shipping_cost: parseFloat(e.target.value) || 0 })} required />
+          <div className="mb-2 flex items-center gap-2">
+            <label className="mr-2 w-20">Weight</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="lbs"
+              className="p-1 w-24 text-black rounded"
+              value={editingProduct ? Math.floor(((editingProduct.weight_oz ?? 0) / 16)) : 0}
+              onChange={e => {
+                if (!editingProduct) return;
+                const lbs = parseInt(e.target.value) || 0;
+                const oz = (editingProduct.weight_oz ?? 0) % 16;
+                setEditingProduct({ ...editingProduct, weight_oz: lbs * 16 + oz });
+              }}
+              required
+            />
+            <span className="text-gray-300">lbs</span>
+            <input
+              type="number"
+              min="0"
+              max="15.9"
+              step="0.1"
+              placeholder="oz"
+              className="p-1 w-24 text-black rounded"
+              value={editingProduct ? (((editingProduct.weight_oz ?? 0) % 16).toFixed(1)) : 0}
+              onChange={e => {
+                if (!editingProduct) return;
+                const oz = parseFloat(e.target.value) || 0;
+                const lbs = Math.floor((editingProduct.weight_oz ?? 0) / 16);
+                setEditingProduct({ ...editingProduct, weight_oz: lbs * 16 + oz });
+              }}
+              required
+            />
+            <span className="text-gray-300">oz</span>
+          </div>
           <input type="datetime-local" className="mb-2 p-1 w-full text-black" value={editingProduct ? new Date(editingProduct.countdown).toISOString().slice(0,16) : ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, countdown: new Date(e.target.value) })} required />
           <input type="checkbox" className="mb-2 mr-2" checked={editingProduct?.published || false} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, published: e.target.checked })} />
           <label className="mr-4">Published</label>
