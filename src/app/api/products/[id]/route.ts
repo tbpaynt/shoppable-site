@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -16,11 +16,12 @@ const parseId = (idParam: string) => {
 };
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idParam } = await params;
   try {
-    const id = parseId(params.id);
+    const id = parseId(idParam);
 
     const { data, error } = await supabase
       .from("products")
@@ -40,11 +41,12 @@ export async function GET(
 }
 
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idParam } = await params;
   try {
-    const id = parseId(params.id);
+    const id = parseId(idParam);
     const body = await request.json();
 
     // Make sure we do not allow updating primary key "id" directly
@@ -69,11 +71,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idParam } = await params;
   try {
-    const id = parseId(params.id);
+    const id = parseId(idParam);
 
     const { error } = await supabase.from("products").delete().eq("id", id);
 
