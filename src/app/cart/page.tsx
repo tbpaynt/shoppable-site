@@ -83,9 +83,9 @@ export default function CartPage() {
       const payload: any = {
         items: cart.map(item => ({ id: item.id, quantity: item.quantity })),
       };
-      if (shippingQuote !== null && shippingRateId) {
-        payload.shipAmount = shippingQuote;
-        payload.rateId = shippingRateId;
+      
+      // Always include address if provided
+      if (address.street1 && address.city && address.state && address.zip) {
         payload.address = {
           street1: address.street1,
           city: address.city,
@@ -93,6 +93,12 @@ export default function CartPage() {
           zip: address.zip,
           country: "US",
         };
+      }
+      
+      // Include shipping info if available
+      if (shippingQuote !== null && shippingRateId) {
+        payload.shipAmount = shippingQuote;
+        payload.rateId = shippingRateId;
         payload.taxAmount = taxTotal;
       }
 

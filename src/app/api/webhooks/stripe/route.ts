@@ -145,13 +145,14 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     if (address_to) {
       const lineItems = orderItems.map((item) => {
         const prodInfo = productMap.get(item.id);
+        const weight = prodInfo?.weight_oz ?? 1; // Default to 1 oz if no weight specified
         return {
           title: item.name,
           quantity: item.quantity,
           total_price: item.price.toFixed(2),
           currency: 'USD',
-          weight: prodInfo?.weight_oz ?? undefined,
-          weight_unit: prodInfo?.weight_oz ? 'oz' : undefined,
+          weight: weight,
+          weight_unit: 'oz',
         } as any;
       });
 
