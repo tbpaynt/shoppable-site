@@ -55,6 +55,9 @@ export async function POST(request: NextRequest) {
 }
 
 async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
+  console.log('🔥 WEBHOOK: Payment succeeded, processing order...');
+  console.log('Payment Intent metadata:', paymentIntent.metadata);
+  
   const {
     orderId,
     userEmail,
@@ -135,6 +138,10 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 
   // Create Shippo order so it shows up in Shippo dashboard
   try {
+    console.log('🚢 Creating Shippo order...');
+    console.log('address_to:', address_to);
+    console.log('orderItems:', orderItems);
+    
     if (address_to) {
       const lineItems = orderItems.map((item) => {
         const prodInfo = productMap.get(item.id);
@@ -148,7 +155,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
         } as any;
       });
 
-      await createShippoOrder({
+      console.log('📦 Shippo order data:', {
         orderNumber: orderId.toString(),
         addressTo: JSON.parse(address_to),
         lineItems,
@@ -156,9 +163,22 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
         shippingCost: ship_cost ? Number(ship_cost) : undefined,
         taxAmount: tax_amount ? Number(tax_amount) : undefined,
       });
+
+      const shippoResult = await createShippoOrder({
+        orderNumber: orderId.toString(),
+        addressTo: JSON.parse(address_to),
+        lineItems,
+        totalPrice: paymentIntent.amount / 100,
+        shippingCost: ship_cost ? Number(ship_cost) : undefined,
+        taxAmount: tax_amount ? Number(tax_amount) : undefined,
+      });
+      
+      console.log('✅ Shippo order created successfully:', shippoResult);
+    } else {
+      console.log('❌ No address_to found, skipping Shippo order creation');
     }
   } catch (e) {
-    console.error('Failed to create Shippo order', e);
+    console.error('❌ Failed to create Shippo order', e);
   }
 
   // Purchase label if rate id present
