@@ -55,8 +55,6 @@ export async function POST(request: NextRequest) {
 }
 
 async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
-  console.log('🔥 WEBHOOK: Payment succeeded, processing order...');
-  console.log('Payment Intent metadata:', paymentIntent.metadata);
   
   const {
     orderId,
@@ -138,31 +136,18 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 
   // Create Shippo order so it shows up in Shippo dashboard
   try {
-    console.log('🚢 Creating Shippo order...');
-    console.log('address_to:', address_to);
-    console.log('orderItems:', orderItems);
-    
     if (address_to) {
       const lineItems = orderItems.map((item) => {
         const prodInfo = productMap.get(item.id);
-        const weight = prodInfo?.weight_oz ?? 1; // Default to 1 oz if no weight specified
+        const weight = prodInfo?.weight_oz ?? 4; // Default to 4 oz if no weight specified
         return {
           title: item.name,
           quantity: item.quantity,
-          total_price: item.price.toFixed(2),
+          total_price: (item.price * item.quantity).toFixed(2), // Fix: multiply by quantity
           currency: 'USD',
           weight: weight,
           weight_unit: 'oz',
-        } as any;
-      });
-
-      console.log('📦 Shippo order data:', {
-        orderNumber: orderId.toString(),
-        addressTo: JSON.parse(address_to),
-        lineItems,
-        totalPrice: paymentIntent.amount / 100,
-        shippingCost: ship_cost ? Number(ship_cost) : undefined,
-        taxAmount: tax_amount ? Number(tax_amount) : undefined,
+        };
       });
 
       const shippoResult = await createShippoOrder({
@@ -174,9 +159,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
         taxAmount: tax_amount ? Number(tax_amount) : undefined,
       });
       
-      console.log('✅ Shippo order created successfully:', shippoResult);
-    } else {
-      console.log('❌ No address_to found, skipping Shippo order creation');
+      console.log('✅ Shippo order created successfully:', shippoResult?.object_id || 'created');
     }
   } catch (e) {
     console.error('❌ Failed to create Shippo order', e);
