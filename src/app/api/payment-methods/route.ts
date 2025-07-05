@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../../auth';
 import { createClient } from '@supabase/supabase-js';
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-05-28.basil',
-});
+import { getStripeServer } from '../../../utils/stripe';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,6 +22,7 @@ async function getOrCreateStripeCustomer(userEmail: string, userName?: string) {
   }
 
   // Create new Stripe customer
+  const stripe = getStripeServer();
   const customer = await stripe.customers.create({
     email: userEmail,
     name: userName || undefined,
@@ -85,6 +82,7 @@ export async function POST() {
     );
 
     // Create setup intent
+    const stripe = getStripeServer();
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -117,6 +115,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Retrieve the setup intent
+    const stripe = getStripeServer();
     const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
 
     if (setupIntent.status !== 'succeeded') {
@@ -195,6 +194,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Detach from Stripe
+    const stripe = getStripeServer();
     await stripe.paymentMethods.detach(paymentMethod.stripe_payment_method_id);
 
     // Delete from database

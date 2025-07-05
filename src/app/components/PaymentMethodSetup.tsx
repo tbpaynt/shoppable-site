@@ -31,44 +31,53 @@ export default function PaymentMethodSetup({
     setIsLoading(true);
 
     try {
-      // Get setup intent client secret
-      if (!clientSecret) {
+      let secret = clientSecret;
+      
+      // Get setup intent client secret if we don't have one
+      if (!secret) {
         const response = await fetch('/api/payment-methods', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
 
         if (!response.ok) {
-          throw new Error('Failed to create setup intent');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create setup intent');
         }
 
         const data = await response.json();
-        setClientSecret(data.clientSecret);
+        secret = data.clientSecret;
+        setClientSecret(secret);
+      }
 
-        // Confirm setup intent
-        const result = await stripe.confirmCardSetup(data.clientSecret, {
-          payment_method: {
-            card: elements.getElement(CardElement)!,
-          },
+      // Confirm setup intent
+      if (!secret) {
+        throw new Error('Failed to get client secret');
+      }
+
+      const result = await stripe.confirmCardSetup(secret, {
+        payment_method: {
+          card: elements.getElement(CardElement)!,
+        },
+      });
+
+      if (result.error) {
+        setError(result.error.message || 'Failed to save payment method');
+      } else {
+        // Save payment method to database
+        const saveResponse = await fetch('/api/payment-methods', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ setupIntentId: result.setupIntent.id }),
         });
 
-        if (result.error) {
-          setError(result.error.message || 'Failed to save payment method');
-        } else {
-          // Save payment method to database
-          const saveResponse = await fetch('/api/payment-methods', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ setupIntentId: result.setupIntent.id }),
-          });
-
-          if (!saveResponse.ok) {
-            throw new Error('Failed to save payment method');
-          }
-
-          const saveData = await saveResponse.json();
-          onSuccess(saveData.paymentMethod);
+        if (!saveResponse.ok) {
+          const errorData = await saveResponse.json();
+          throw new Error(errorData.error || 'Failed to save payment method');
         }
+
+        const saveData = await saveResponse.json();
+        onSuccess(saveData.paymentMethod);
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
