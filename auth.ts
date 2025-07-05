@@ -63,7 +63,7 @@ export const config = {
   callbacks: {
     async signIn({ user }) {
       const adminEmail = process.env.ADMIN_EMAIL;
-      if (user.email === adminEmail) {
+      if (user.email?.toLowerCase() === adminEmail?.toLowerCase()) {
         (user as any).role = "admin"
       }
       return true
