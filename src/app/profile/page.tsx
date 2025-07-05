@@ -1,21 +1,22 @@
 "use client";
 import { useSession, signIn } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import StripeProfileWrapper from "../components/StripeProfileWrapper";
+import PaymentMethodSetup from "../components/PaymentMethodSetup";
 
 type PaymentMethod = {
   id: string;
-  type: 'card' | 'paypal';
+  stripe_payment_method_id: string;
+  stripe_customer_id: string;
+  type: string;
   last4?: string;
   brand?: string;
-  expiry?: string;
+  exp_month?: number;
+  exp_year?: number;
   is_default: boolean;
   created_at: string;
+  updated_at: string;
+  user_email: string;
 };
 
 type ShippingAddress = {
@@ -43,6 +44,7 @@ export default function ProfilePage() {
   
   // Payment Methods
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [showAddPayment, setShowAddPayment] = useState(false);
   
   // Shipping Addresses
   const [shippingAddresses, setShippingAddresses] = useState<ShippingAddress[]>([]);
@@ -62,18 +64,27 @@ export default function ProfilePage() {
     
     setLoading(true);
     try {
-      // Load shipping addresses
-      const { data: addresses } = await supabase
-        .from('shipping_addresses')
-        .select('*')
-        .eq('user_email', session.user.email)
-        .order('created_at', { ascending: false });
+      // Load personal info from API
+      const profileResponse = await fetch('/api/profile');
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        setName(profileData.name || '');
+        setPhone(profileData.phone || '');
+      }
+
+      // Load shipping addresses from API
+      const addressResponse = await fetch('/api/addresses');
+      if (addressResponse.ok) {
+        const addressData = await addressResponse.json();
+        setShippingAddresses(addressData.addresses || []);
+      }
       
-      if (addresses) setShippingAddresses(addresses);
-      
-      // Payment methods would typically come from Stripe
-      // For now, we'll show a placeholder structure
-      setPaymentMethods([]);
+      // Load payment methods from API
+      const paymentResponse = await fetch('/api/payment-methods');
+      if (paymentResponse.ok) {
+        const paymentData = await paymentResponse.json();
+        setPaymentMethods(paymentData.paymentMethods || []);
+      }
       
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -96,19 +107,21 @@ export default function ProfilePage() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('shipping_addresses')
-        .insert([{
-          user_email: session.user.email,
-          ...newAddress,
-          is_default: shippingAddresses.length === 0 // First address is default
-        }])
-        .select()
-        .single();
+      const response = await fetch('/api/addresses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newAddress),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save address');
+      }
 
-      setShippingAddresses([data, ...shippingAddresses]);
+      const data = await response.json();
+      setShippingAddresses([data.address, ...shippingAddresses]);
       setNewAddress({
         name: '',
         street1: '',
@@ -121,6 +134,7 @@ export default function ProfilePage() {
       setShowAddAddress(false);
     } catch (error) {
       console.error('Error adding address:', error);
+      alert('Failed to save address. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -131,16 +145,77 @@ export default function ProfilePage() {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('shipping_addresses')
-        .delete()
-        .eq('id', addressId);
+      const response = await fetch(`/api/addresses?id=${addressId}`, {
+        method: 'DELETE',
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete address');
+      }
 
       setShippingAddresses(shippingAddresses.filter(addr => addr.id !== addressId));
     } catch (error) {
       console.error('Error deleting address:', error);
+      alert('Failed to delete address. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePersonalInfoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.user?.email) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, phone }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+
+      const data = await response.json();
+      alert('Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePaymentMethodSuccess = (paymentMethod: any) => {
+    setPaymentMethods([paymentMethod, ...paymentMethods]);
+    setShowAddPayment(false);
+    loadUserData(); // Refresh the list
+  };
+
+  const deletePaymentMethod = async (paymentMethodId: string) => {
+    if (!confirm('Are you sure you want to remove this payment method?')) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/payment-methods?id=${paymentMethodId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove payment method');
+      }
+
+      setPaymentMethods(paymentMethods.filter(pm => pm.id !== paymentMethodId));
+    } catch (error) {
+      console.error('Error removing payment method:', error);
+      alert('Failed to remove payment method. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -164,9 +239,10 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">My Profile</h1>
+    <StripeProfileWrapper>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">My Profile</h1>
         
         {/* Tab Navigation */}
         <div className="bg-white rounded-lg shadow mb-6">
@@ -210,7 +286,7 @@ export default function ProfilePage() {
             {activeTab === 'personal' && (
               <div className="space-y-6">
                 <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
-                <form className="space-y-4">
+                <form onSubmit={handlePersonalInfoSubmit} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                     <input
@@ -242,9 +318,10 @@ export default function ProfilePage() {
                   </div>
                   <button
                     type="submit"
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={loading}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                   >
-                    Save Changes
+                    {loading ? 'Saving...' : 'Save Changes'}
                   </button>
                 </form>
               </div>
@@ -256,7 +333,7 @@ export default function ProfilePage() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold text-gray-900">Payment Methods</h2>
                   <button
-                    onClick={() => alert('Payment method management coming soon!')}
+                    onClick={() => setShowAddPayment(true)}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Add Payment Method
@@ -283,16 +360,31 @@ export default function ProfilePage() {
                           </div>
                           <div>
                             <p className="font-medium">•••• •••• •••• {method.last4}</p>
-                            <p className="text-sm text-gray-500">{method.brand} • Expires {method.expiry}</p>
+                            <p className="text-sm text-gray-500">{method.brand?.toUpperCase()} • Expires {method.exp_month?.toString().padStart(2, '0')}/{method.exp_year}</p>
                           </div>
                           {method.is_default && (
                             <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Default</span>
                           )}
                         </div>
-                        <button className="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                        <button 
+                          onClick={() => deletePaymentMethod(method.id)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Remove
+                        </button>
                       </div>
                     ))}
                   </div>
+                )}
+
+                {/* Add Payment Method Form */}
+                {showAddPayment && (
+                  <PaymentMethodSetup
+                    onSuccess={handlePaymentMethodSuccess}
+                    onCancel={() => setShowAddPayment(false)}
+                    isLoading={loading}
+                    setIsLoading={setLoading}
+                  />
                 )}
               </div>
             )}
@@ -451,6 +543,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </StripeProfileWrapper>
   );
 } 
