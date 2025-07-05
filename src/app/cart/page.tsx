@@ -30,7 +30,7 @@ export default function CartPage() {
 
   // Trigger quote when cart or address changes
   useEffect(() => {
-    const ready = address.street1 && address.city && address.state && address.zip && cart.length > 0;
+    const ready = address.name && address.street1 && address.city && address.state && address.zip && cart.length > 0;
     if (!ready) return;
     const fetchQuote = async () => {
       setQuoteLoading(true);
@@ -39,6 +39,7 @@ export default function CartPage() {
         const payload = {
           items: cart.map((c) => ({ id: c.id, quantity: c.quantity })),
           address: {
+            name: address.name,
             street1: address.street1,
             city: address.city,
             state: address.state,
@@ -64,7 +65,7 @@ export default function CartPage() {
       }
     };
     fetchQuote();
-  }, [cart, address.street1, address.city, address.state, address.zip]);
+  }, [cart, address.name, address.street1, address.city, address.state, address.zip]);
 
   const productTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   // Use dynamic quote if available else per-item shipping cost fallback
@@ -85,8 +86,9 @@ export default function CartPage() {
       };
       
       // Always include address if provided
-      if (address.street1 && address.city && address.state && address.zip) {
+      if (address.name && address.street1 && address.city && address.state && address.zip) {
         payload.address = {
+          name: address.name,
           street1: address.street1,
           city: address.city,
           state: address.state,
@@ -226,6 +228,13 @@ export default function CartPage() {
         <>
           {/* Shipping address */}
           <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="Recipient Name"
+              value={address.name}
+              onChange={(e) => setAddress({ ...address, name: e.target.value })}
+              className="p-2 border rounded text-black col-span-1 md:col-span-2"
+            />
             <input
               type="text"
               placeholder="Street Address"

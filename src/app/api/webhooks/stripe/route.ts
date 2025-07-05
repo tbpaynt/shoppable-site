@@ -3,7 +3,7 @@ import { getStripeServer } from '../../../../utils/stripe';
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
-import { purchaseLabel, createShippoOrder } from '../../../../utils/shippo';
+import { purchaseLabel, createShippoOrder, getRateForLabelPurchase } from '../../../../utils/shippo';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
 }
 
 async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
+  console.log('🔥 WEBHOOK: Processing payment success for:', paymentIntent.id);
+  console.log('🔥 WEBHOOK: Full metadata:', paymentIntent.metadata);
   
   const {
     orderId,
@@ -66,8 +68,10 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     address_to,
   } = paymentIntent.metadata as any;
   
+  console.log('🔥 WEBHOOK: Parsed metadata:', { orderId, userEmail, items: !!items, address_to: !!address_to });
+  
   if (!userEmail || !items || !orderId) {
-    console.error('Missing required metadata in payment intent');
+    console.error('❌ WEBHOOK: Missing required metadata in payment intent');
     return;
   }
   
@@ -117,6 +121,8 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 
   const productMap = new Map<number, { stock: number | null; weight_oz: number | null }>();
   (productsData || []).forEach((p) => productMap.set(p.id, { stock: p.stock, weight_oz: p.weight_oz }));
+  
+
 
   for (const item of orderItems) {
     const prodInfo = productMap.get(item.id);
@@ -135,12 +141,17 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   }
 
   // Create Shippo order so it shows up in Shippo dashboard
+  console.log('🔥 WEBHOOK: About to create Shippo order, address_to:', address_to);
   try {
     if (address_to) {
+      console.log('🔥 WEBHOOK: Creating Shippo order...');
+      const parsedAddress = JSON.parse(address_to);
+      console.log('🔥 WEBHOOK: Parsed address:', parsedAddress);
+      
       const lineItems = orderItems.map((item) => {
         const prodInfo = productMap.get(item.id);
         const weight = prodInfo?.weight_oz ?? 4; // Default to 4 oz if no weight specified
-        return {
+        const lineItem = {
           title: item.name,
           quantity: item.quantity,
           total_price: (item.price * item.quantity).toFixed(2), // Fix: multiply by quantity
@@ -148,11 +159,22 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
           weight: weight,
           weight_unit: 'oz',
         };
+        console.log('🔥 WEBHOOK: Line item:', lineItem);
+        return lineItem;
+      });
+
+      console.log('🔥 WEBHOOK: About to call createShippoOrder with:', {
+        orderNumber: orderId.toString(),
+        addressTo: parsedAddress,
+        lineItemsCount: lineItems.length,
+        totalPrice: paymentIntent.amount / 100,
+        shippingCost: ship_cost ? Number(ship_cost) : undefined,
+        taxAmount: tax_amount ? Number(tax_amount) : undefined,
       });
 
       const shippoResult = await createShippoOrder({
         orderNumber: orderId.toString(),
-        addressTo: JSON.parse(address_to),
+        addressTo: parsedAddress,
         lineItems,
         totalPrice: paymentIntent.amount / 100,
         shippingCost: ship_cost ? Number(ship_cost) : undefined,
@@ -160,23 +182,19 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
       });
       
       console.log('✅ Shippo order created successfully:', shippoResult?.object_id || 'created');
+      console.log('✅ Full Shippo result:', JSON.stringify(shippoResult, null, 2));
+    } else {
+      console.log('❌ WEBHOOK: No address_to provided, skipping Shippo order creation');
     }
   } catch (e) {
-    console.error('❌ Failed to create Shippo order', e);
+    console.error('❌ Failed to create Shippo order - Full error:', e);
+    console.error('❌ Error message:', (e as Error)?.message);
+    console.error('❌ Error stack:', (e as Error)?.stack);
   }
 
-  // Purchase label if rate id present
-  if (shippo_rate_id) {
-    try {
-      const label = await purchaseLabel(shippo_rate_id);
-      await supabase
-        .from('orders')
-        .update({ tracking_number: label.trackingNumber, label_url: label.labelUrl })
-        .eq('id', orderId);
-    } catch (e) {
-      console.error('Shippo purchase failed', e);
-    }
-  }
+  // Note: Automatic label purchasing disabled - orders will appear in Shippo dashboard
+  // for manual label creation. To re-enable automatic labels, uncomment the section below.
+  console.log('✅ Order created in Shippo for manual label processing:', orderId);
 
   console.log(`Payment succeeded for order ${orderId}`);
 }
