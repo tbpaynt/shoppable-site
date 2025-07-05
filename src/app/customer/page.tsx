@@ -11,6 +11,9 @@ const supabase = createClient(
 type Order = {
   id: string;
   created_at: string;
+  total_amount: number;
+  ship_cost: number | null;
+  tax_amount: number | null;
   order_items: { id: string; name: string; price: number; quantity: number }[];
   tracking_info?: {
     tracking_number?: string;
@@ -68,7 +71,7 @@ function PurchaseHistory({ userEmail }: { userEmail: string }) {
       try {
         const { data, error } = await supabase
           .from('orders')
-          .select('id, created_at, total_amount, status, tracking_number, label_url, order_items(id, name, price, quantity)')
+          .select('id, created_at, total_amount, ship_cost, tax_amount, status, tracking_number, label_url, order_items(id, name, price, quantity)')
           .eq('user_email', userEmail)
           .order('created_at', { ascending: false });
 
@@ -295,9 +298,30 @@ function PurchaseHistory({ userEmail }: { userEmail: string }) {
               )}
 
               <div className="mt-2 pt-2 border-t border-gray-600">
-                <div className="flex justify-between items-center text-white font-bold">
-                  <span>Total</span>
-                  <span>${order.order_items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}</span>
+                <div className="space-y-1 text-sm">
+                  {/* Product Subtotal */}
+                  <div className="flex justify-between items-center text-gray-300">
+                    <span>Subtotal ({order.order_items.reduce((sum, item) => sum + item.quantity, 0)} item{order.order_items.reduce((sum, item) => sum + item.quantity, 0) !== 1 ? 's' : ''})</span>
+                    <span>${order.order_items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}</span>
+                  </div>
+                  
+                  {/* Shipping Cost */}
+                  <div className="flex justify-between items-center text-gray-300">
+                    <span>Shipping</span>
+                    <span>${order.ship_cost ? order.ship_cost.toFixed(2) : '0.00'}</span>
+                  </div>
+                  
+                  {/* Tax */}
+                  <div className="flex justify-between items-center text-gray-300">
+                    <span>Tax</span>
+                    <span>${order.tax_amount ? order.tax_amount.toFixed(2) : '0.00'}</span>
+                  </div>
+                  
+                  {/* Total */}
+                  <div className="flex justify-between items-center text-white font-bold text-base pt-1 border-t border-gray-600">
+                    <span>Total</span>
+                    <span>${order.total_amount.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </div>
