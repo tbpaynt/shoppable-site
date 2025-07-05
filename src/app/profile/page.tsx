@@ -182,7 +182,7 @@ export default function ProfilePage() {
         throw new Error(errorData.error || 'Failed to update profile');
       }
 
-      const data = await response.json();
+      await response.json();
       alert('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
