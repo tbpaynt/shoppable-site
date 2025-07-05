@@ -15,12 +15,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
     }
 
-    // Prevent creation of admin accounts through public signup
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (adminEmail && email.toLowerCase() === adminEmail.toLowerCase()) {
-      return NextResponse.json({ message: 'This email address is not available for registration' }, { status: 400 });
-    }
-
     // Check if user already exists
     const { data: existingUser } = await supabase
       .from('users')
