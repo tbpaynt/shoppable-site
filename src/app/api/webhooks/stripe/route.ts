@@ -3,7 +3,7 @@ import { getStripeServer } from '../../../../utils/stripe';
 import { createClient } from '@supabase/supabase-js';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
-import { purchaseLabel, createShippoOrder, getRateForLabelPurchase } from '../../../../utils/shippo';
+import { createShippoOrder } from '../../../../utils/shippo';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,7 +62,6 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     orderId,
     userEmail,
     items,
-    shippo_rate_id,
     ship_cost,
     tax_amount,
     address_to,
