@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           email,
-          password: hashedPassword,
+          password_hash: hashedPassword,
+          name: email.split('@')[0], // Use first part of email as default name
         }
       ])
       .select()
