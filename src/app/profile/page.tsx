@@ -1,6 +1,6 @@
 "use client";
 import { useSession, signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -43,7 +43,6 @@ export default function ProfilePage() {
   
   // Payment Methods
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [showAddPayment, setShowAddPayment] = useState(false);
   
   // Shipping Addresses
   const [shippingAddresses, setShippingAddresses] = useState<ShippingAddress[]>([]);
@@ -58,15 +57,7 @@ export default function ProfilePage() {
     country: 'US'
   });
 
-  useEffect(() => {
-    if (session?.user) {
-      setEmail(session.user.email || '');
-      setName(session.user.name || '');
-      loadUserData();
-    }
-  }, [session]);
-
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     if (!session?.user?.email) return;
     
     setLoading(true);
@@ -89,7 +80,15 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.user?.email]);
+
+  useEffect(() => {
+    if (session?.user) {
+      setEmail(session.user.email || '');
+      setName(session.user.name || '');
+      loadUserData();
+    }
+  }, [session, loadUserData]);
 
   const handleAddAddress = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,7 +256,7 @@ export default function ProfilePage() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold text-gray-900">Payment Methods</h2>
                   <button
-                    onClick={() => setShowAddPayment(true)}
+                    onClick={() => alert('Payment method management coming soon!')}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Add Payment Method
