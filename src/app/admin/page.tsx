@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { Product } from "../products";
 import { supabase } from "../../utils/supabaseClient";
 import Image from 'next/image';
+import Link from 'next/link';
 
 // Robust helper to format UTC string to local datetime-local input value
 function utcToLocalInputValue(utcString: string) {
@@ -339,9 +340,9 @@ export default function AdminPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <a href="/" className="text-gray-400 hover:text-gray-300 text-sm">
+            <Link href="/" className="text-gray-400 hover:text-gray-300 text-sm">
               ← Back to store
-            </a>
+            </Link>
           </div>
                   </div>
         </div>
