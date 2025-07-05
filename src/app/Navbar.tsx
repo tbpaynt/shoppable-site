@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { useCart } from './CartContext';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 
 export default function Navbar() {
   const { cart } = useCart();
@@ -21,14 +21,19 @@ export default function Navbar() {
               Orders
             </Link>
             <span className="text-lg">{session.user?.email}</span>
-            <button onClick={() => signOut()} className="text-lg flex items-center gap-2">
+            <button onClick={() => signOut()} className="text-lg flex items-center gap-2 hover:text-gray-300">
               Sign Out
             </button>
           </>
         ) : (
-          <button onClick={() => signIn()} className="text-lg flex items-center gap-2">
-            Login
-          </button>
+          <>
+            <Link href="/login" className="text-lg hover:text-gray-300">
+              Login
+            </Link>
+            <Link href="/signup" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+              Sign Up
+            </Link>
+          </>
         )}
         <Link href="/cart" className="relative flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
