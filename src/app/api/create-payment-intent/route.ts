@@ -9,6 +9,42 @@ interface CartItemInRequest {
   quantity: number;
 }
 
+// Get or create Stripe customer
+async function getOrCreateStripeCustomer(userEmail: string, userName?: string) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Check if customer already exists in our database
+  const { data: existingCustomer } = await supabase
+    .from('stripe_customers')
+    .select('stripe_customer_id')
+    .eq('user_email', userEmail)
+    .single();
+
+  if (existingCustomer) {
+    return existingCustomer.stripe_customer_id;
+  }
+
+  // Create new Stripe customer
+  const stripe = getStripeServer();
+  const customer = await stripe.customers.create({
+    email: userEmail,
+    name: userName || undefined,
+  });
+
+  // Save to database
+  await supabase
+    .from('stripe_customers')
+    .insert({
+      user_email: userEmail,
+      stripe_customer_id: customer.id,
+    });
+
+  return customer.id;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // ───────────────────────────────────────────────
@@ -85,7 +121,15 @@ export async function POST(request: NextRequest) {
     }
 
     // ───────────────────────────────────────────────
-    // 5. Create PaymentIntent
+    // 5. Get or create Stripe customer ID
+    // ───────────────────────────────────────────────
+    const customerId = await getOrCreateStripeCustomer(
+      session.user.email,
+      session.user.name || undefined
+    );
+
+    // ───────────────────────────────────────────────
+    // 6. Create PaymentIntent with customer ID
     // ───────────────────────────────────────────────
     const stripe = getStripeServer();
 
@@ -94,6 +138,7 @@ export async function POST(request: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalInCents,
       currency: "usd",
+      customer: customerId,
       metadata: {
         orderId,
         userEmail: session.user.email,
@@ -115,7 +160,7 @@ export async function POST(request: NextRequest) {
     });
 
     // ───────────────────────────────────────────────
-    // 6. TODO: Insert a pending order row if you track orders in Supabase
+    // 7. TODO: Insert a pending order row if you track orders in Supabase
     //    await supabase.from('orders').insert({...})
     // ───────────────────────────────────────────────
 
