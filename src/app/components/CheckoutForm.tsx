@@ -13,11 +13,12 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 
 interface CheckoutFormProps {
   clientSecret: string;
+  customerSessionClientSecret?: string;
   onSuccess: () => void;
   onError: (error: string) => void;
 }
 
-function CheckoutFormContent({ onSuccess, onError }: Omit<CheckoutFormProps, 'clientSecret'>) {
+function CheckoutFormContent({ onSuccess, onError }: Omit<CheckoutFormProps, 'clientSecret' | 'customerSessionClientSecret'>) {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -82,18 +83,24 @@ function CheckoutFormContent({ onSuccess, onError }: Omit<CheckoutFormProps, 'cl
   );
 }
 
-export default function CheckoutForm({ clientSecret, onSuccess, onError }: CheckoutFormProps) {
+export default function CheckoutForm({ clientSecret, customerSessionClientSecret, onSuccess, onError }: CheckoutFormProps) {
+  const options: any = { 
+    clientSecret,
+    appearance: {
+      theme: 'stripe',
+    },
+    locale: 'en'
+  };
+
+  // Add customer session client secret if provided
+  if (customerSessionClientSecret) {
+    options.customerSessionClientSecret = customerSessionClientSecret;
+  }
+
   return (
     <Elements 
       stripe={stripePromise} 
-      options={{ 
-        clientSecret,
-        appearance: {
-          theme: 'stripe',
-        },
-        // Enable saved payment methods
-        locale: 'en'
-      }}
+      options={options}
     >
       <CheckoutFormContent onSuccess={onSuccess} onError={onError} />
     </Elements>

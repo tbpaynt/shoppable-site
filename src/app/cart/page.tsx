@@ -8,6 +8,7 @@ import CheckoutForm from '../components/CheckoutForm';
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [customerSessionClientSecret, setCustomerSessionClientSecret] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -139,6 +140,7 @@ export default function CartPage() {
       }
 
       setClientSecret(data.clientSecret);
+      setCustomerSessionClientSecret(data.customerSessionClientSecret ?? null);
       setOrderId(data.orderId ?? null);
       setShowCheckout(true);
     } catch (err: unknown) {
@@ -153,6 +155,7 @@ export default function CartPage() {
     clearCart();
     setShowCheckout(false);
     setClientSecret(null);
+    setCustomerSessionClientSecret(null);
 
     // Navigate to success / thank-you page
     if (typeof window !== 'undefined') {
@@ -165,6 +168,7 @@ export default function CartPage() {
     setError(errorMessage);
     setShowCheckout(false);
     setClientSecret(null);
+    setCustomerSessionClientSecret(null);
   };
 
   if (showCheckout && clientSecret) {
@@ -202,6 +206,7 @@ export default function CartPage() {
         </div>
         <CheckoutForm
           clientSecret={clientSecret}
+          customerSessionClientSecret={customerSessionClientSecret || undefined}
           onSuccess={handlePaymentSuccess}
           onError={handlePaymentError}
         />
@@ -209,6 +214,7 @@ export default function CartPage() {
           onClick={() => {
             setShowCheckout(false);
             setClientSecret(null);
+            setCustomerSessionClientSecret(null);
             setError(null);
           }}
           className="mt-4 w-full bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600"

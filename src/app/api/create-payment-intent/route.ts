@@ -127,15 +127,7 @@ export async function POST(request: NextRequest) {
       session.user.email,
       session.user.name || undefined
     );
-    console.log('Customer ID for payment intent:', customerId);
 
-    // Debug: Check if customer has saved payment methods
-    const { data: savedPaymentMethods } = await supabase
-      .from('payment_methods')
-      .select('*')
-      .eq('user_email', session.user.email);
-    
-    console.log('Saved payment methods for user:', savedPaymentMethods);
 
     // ───────────────────────────────────────────────
     // 6. Create PaymentIntent with customer ID
@@ -168,14 +160,31 @@ export async function POST(request: NextRequest) {
       automatic_payment_methods: { enabled: true },
     });
 
-    console.log('Payment intent created:', paymentIntent.id, 'with customer:', paymentIntent.customer);
+    // ───────────────────────────────────────────────
+    // 7. Create CustomerSession to enable saved payment methods
+    // ───────────────────────────────────────────────
+    const customerSession = await stripe.customerSessions.create({
+      customer: customerId,
+      components: {
+        payment_element: {
+          enabled: true,
+          features: {
+            payment_method_redisplay: 'enabled',
+          },
+        },
+      },
+    });
 
     // ───────────────────────────────────────────────
-    // 7. TODO: Insert a pending order row if you track orders in Supabase
+    // 8. TODO: Insert a pending order row if you track orders in Supabase
     //    await supabase.from('orders').insert({...})
     // ───────────────────────────────────────────────
 
-    return NextResponse.json({ clientSecret: paymentIntent.client_secret, orderId });
+    return NextResponse.json({ 
+      clientSecret: paymentIntent.client_secret, 
+      customerSessionClientSecret: customerSession.client_secret,
+      orderId 
+    });
   } catch (err: unknown) {
     const error = err as Error;
     console.error("Error in create-payment-intent:", error);
