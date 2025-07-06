@@ -93,6 +93,10 @@ export default function StorePage() {
                       )}
                     </div>
                   </div>
+                  <div className="mb-2 text-sm text-gray-300">Stock: {product.stock ?? 0}</div>
+                  {product.stock === 0 && (
+                    <div className="mb-2 text-red-400 font-bold text-sm">Sold Out</div>
+                  )}
                   <button
                     onClick={() => addToCart({
                       id: product.id,
@@ -101,7 +105,8 @@ export default function StorePage() {
                       price: product.price,
                       shipping_cost: product.shipping_cost ?? 0
                     })}
-                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+                    disabled={product.stock === 0}
                   >
                     Add to Cart
                   </button>
