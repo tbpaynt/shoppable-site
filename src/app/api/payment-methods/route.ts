@@ -77,7 +77,7 @@ export async function GET() {
     console.log('User email:', session.user.email);
 
     // Test database connection
-    const { data: testData, error: testError } = await supabase
+    const { error: testError } = await supabase
       .from('payment_methods')
       .select('count')
       .limit(1);
@@ -124,7 +124,7 @@ export async function POST() {
 
     // Test Stripe connection
     try {
-      const stripe = getStripeServer();
+      getStripeServer();
       console.log('Stripe instance created successfully');
     } catch (stripeError) {
       console.error('Stripe initialization error:', stripeError);
