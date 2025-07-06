@@ -648,6 +648,7 @@ export default function AdminPage() {
             />
             <span className="text-gray-300">oz</span>
           </div>
+          <input type="number" placeholder="Stock Quantity" className="mb-2 p-1 w-full text-black" value={editingProduct?.stock ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })} required />
           <input type="datetime-local" className="mb-2 p-1 w-full text-black" value={editingProduct ? new Date(editingProduct.countdown).toISOString().slice(0,16) : ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, countdown: new Date(e.target.value) })} required />
           <input type="checkbox" className="mb-2 mr-2" checked={editingProduct?.published || false} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, published: e.target.checked })} />
           <label className="mr-4">Published</label>
