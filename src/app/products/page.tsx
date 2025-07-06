@@ -50,7 +50,7 @@ export default function ProductListPage({}) {
   const isBeforeGoLive = goLiveDate && now < goLiveDate;
   const countdown = goLiveDate ? formatCountdown(goLiveDate.getTime() - now.getTime()) : null;
 
-  const publishedProducts = products.filter(product => product.published && product.stock > 0);
+  const publishedProducts = products.filter(product => product.published);
 
   return (
     <div className="max-w-full min-h-screen" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'}}>
