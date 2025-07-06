@@ -178,20 +178,8 @@ export default function HomePage() {
       )}
       {!isBeforeGoLive && (
         <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
-          <div className="flex items-center gap-8 mb-8">
-            <Image
-              src="/kt-wholesale-logo.png"
-              alt="KT Wholesale Finds"
-              width={200}
-              height={100}
-              className="h-20 w-auto"
-              priority
-            />
-            <div className="text-center">
-              <h1 className="text-4xl font-extrabold mb-2">WE ARE LIVE</h1>
-              <div className="text-xl italic">Don&apos;t let a good deal get by!!!</div>
-            </div>
-          </div>
+          <h1 className="text-4xl font-extrabold mb-2 text-center">WE ARE LIVE</h1>
+          <div className="text-xl mb-8 text-center italic">Don&apos;t let a good deal get by!!!</div>
           
           {/* Search and Filter Section */}
           <div className="max-w-7xl w-full px-4 mb-4">
