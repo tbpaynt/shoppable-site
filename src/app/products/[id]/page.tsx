@@ -72,7 +72,7 @@ export default function ProductDetailPage() {
   if (!product) return <div className="p-8 text-red-600">Product not found.</div>;
 
   return (
-    <div className="max-w-3xl mx-auto p-8 bg-white rounded shadow text-gray-900">
+    <div className="max-w-3xl mx-auto p-8 bg-gray-50 rounded shadow text-gray-900">
       <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
       <div className="mb-2 text-gray-600">Listing #: {product.listing_number}</div>
       <div className="mb-2 text-gray-600">Category: {categoryName}</div>
