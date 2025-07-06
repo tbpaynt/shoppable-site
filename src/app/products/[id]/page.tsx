@@ -72,10 +72,10 @@ export default function ProductDetailPage() {
   if (!product) return <div className="p-8 text-red-600">Product not found.</div>;
 
   return (
-    <div className="max-w-3xl mx-auto p-8 bg-gray-50 rounded shadow text-gray-900">
+    <div className="max-w-3xl mx-auto p-8 bg-gray-800 rounded shadow text-white">
       <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
-      <div className="mb-2 text-gray-600">Listing #: {product.listing_number}</div>
-      <div className="mb-2 text-gray-600">Category: {categoryName}</div>
+      <div className="mb-2 text-gray-300">Listing #: {product.listing_number}</div>
+      <div className="mb-2 text-gray-300">Category: {categoryName}</div>
       <div className="mb-4 flex gap-4">
         <Image src={product.image} alt={product.name} width={256} height={256} className="h-64 w-64 object-cover rounded border" />
         {images && images.length > 0 && (
@@ -87,14 +87,14 @@ export default function ProductDetailPage() {
         )}
       </div>
       <div className="mb-4">
-        <span className="text-xl font-semibold text-green-700 mr-4">${product.price.toFixed(2)}</span>
-        <span className="text-lg line-through text-gray-500">${product.retail.toFixed(2)}</span>
+        <span className="text-xl font-semibold text-green-400 mr-4">${product.price.toFixed(2)}</span>
+        <span className="text-lg line-through text-gray-400">${product.retail.toFixed(2)}</span>
       </div>
-      <div className="mb-4">Stock: {product.stock ?? 0}</div>
+      <div className="mb-4 text-gray-300">Stock: {product.stock ?? 0}</div>
       {product.stock === 0 && (
-        <div className="mb-4 text-red-600 font-bold text-xl">Sold Out</div>
+        <div className="mb-4 text-red-400 font-bold text-xl">Sold Out</div>
       )}
-      <div className="mb-6 whitespace-pre-line">{product.description}</div>
+      <div className="mb-6 whitespace-pre-line text-gray-200">{product.description}</div>
       <div className="flex gap-4 mt-6">
         <button 
           className={`bg-blue-600 text-white px-6 py-2 rounded text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-transform duration-200 ${isAnimating ? 'animate-button-bounce' : ''}`}
