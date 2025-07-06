@@ -85,26 +85,26 @@ export default function ProductListPage({}) {
         <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
           <h1 className="text-4xl font-extrabold mb-2 text-center">WE ARE LIVE</h1>
           <div className="text-xl mb-8 text-center italic">Don&apos;t let a good deal get by!!!</div>
-          <div className="max-w-5xl w-full px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+          <div className="max-w-7xl w-full px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {publishedProducts.map(product => (
-              <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-4 text-gray-900">
+              <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-3 text-gray-900">
                 <Link href={`/products/${product.id}`}>
-                  <Image src={product.image} alt={product.name} width={400} height={192} className="h-48 w-full object-cover rounded mb-4" />
-                  <div className="font-semibold text-lg mb-1">{product.name}</div>
-                  <div className="mb-1 text-gray-600">Listing #: {product.listing_number}</div>
-                  <div className="mb-1 text-gray-600">Stock: {product.stock ?? 0}</div>
+                  <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
+                  <div className="font-semibold text-base mb-1">{product.name}</div>
+                  <div className="mb-1 text-gray-600 text-sm">Listing #: {product.listing_number}</div>
+                  <div className="mb-1 text-gray-600 text-sm">Stock: {product.stock ?? 0}</div>
                   <div className="mb-2">
-                    <span className="text-green-700 font-bold mr-2">${product.price.toFixed(2)}</span>
-                    <span className="line-through text-gray-500">${product.retail.toFixed(2)}</span>
+                    <span className="text-green-700 font-bold mr-2 text-lg">${product.price.toFixed(2)}</span>
+                    <span className="line-through text-gray-500 text-sm">${product.retail.toFixed(2)}</span>
                   </div>
-                  <div className="text-sm text-gray-700 line-clamp-2">{product.description}</div>
+                  <div className="text-xs text-gray-700 line-clamp-2">{product.description}</div>
                   {product.stock === 0 && (
-                    <div className="mt-2 text-red-600 font-bold">Sold Out</div>
+                    <div className="mt-2 text-red-600 font-bold text-sm">Sold Out</div>
                   )}
                 </Link>
-                <div className="flex gap-2 mt-4">
-                  <button className="bg-blue-600 text-white px-3 py-1 rounded disabled:opacity-50" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })} disabled={product.stock === 0}>Add to Cart</button>
-                  <button className="bg-green-600 text-white px-3 py-1 rounded disabled:opacity-50" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }} disabled={product.stock === 0}>Buy</button>
+                <div className="flex gap-1 mt-3">
+                  <button className="bg-blue-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })} disabled={product.stock === 0}>Add to Cart</button>
+                  <button className="bg-green-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }} disabled={product.stock === 0}>Buy</button>
                 </div>
               </div>
             ))}
