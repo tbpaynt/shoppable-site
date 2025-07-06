@@ -76,7 +76,6 @@ export default function AdminPage() {
   const [bulkImportErrors, setBulkImportErrors] = useState<string[]>([]);
   const [bulkImportLoading, setBulkImportLoading] = useState(false);
   const [bulkProducts, setBulkProducts] = useState<Array<Omit<Product, 'id'> & { category_id?: number; temp_id: string }>>([]);
-  const [showBulkForm, setShowBulkForm] = useState(false);
   const [bulkProductImages, setBulkProductImages] = useState<{ [key: string]: File | null }>({});
 
   // Handle email/password login
@@ -374,7 +373,7 @@ export default function AdminPage() {
         setBulkProducts(products);
         setBulkImportErrors([]);
       }
-    } catch (error) {
+    } catch {
       setBulkImportErrors(['Error parsing CSV file. Please check the format.']);
     }
 
@@ -936,6 +935,7 @@ export default function AdminPage() {
                      {/* Image Preview */}
                      {bulkProductImages[product.temp_id] && (
                        <div className="mb-3">
+                         {/* eslint-disable-next-line @next/next/no-img-element */}
                          <img
                            src={URL.createObjectURL(bulkProductImages[product.temp_id]!)}
                            alt="Preview"
