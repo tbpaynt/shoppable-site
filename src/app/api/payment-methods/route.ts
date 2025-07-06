@@ -10,81 +10,42 @@ const supabase = createClient(
 
 // Get or create Stripe customer
 async function getOrCreateStripeCustomer(userEmail: string, userName?: string) {
-  try {
-    console.log('getOrCreateStripeCustomer - Starting for:', userEmail);
-    
-    // Check if customer already exists in our database
-    const { data: existingCustomer, error: fetchError } = await supabase
-      .from('stripe_customers')
-      .select('stripe_customer_id')
-      .eq('user_email', userEmail)
-      .single();
+  // Check if customer already exists in our database
+  const { data: existingCustomer } = await supabase
+    .from('stripe_customers')
+    .select('stripe_customer_id')
+    .eq('user_email', userEmail)
+    .single();
 
-    console.log('Existing customer query:', fetchError ? 'ERROR' : 'SUCCESS');
-    if (fetchError) {
-      console.error('Customer fetch error:', fetchError);
-    }
-
-    if (existingCustomer) {
-      console.log('Found existing customer:', existingCustomer.stripe_customer_id);
-      return existingCustomer.stripe_customer_id;
-    }
-
-    // Create new Stripe customer
-    console.log('Creating new Stripe customer...');
-    const stripe = getStripeServer();
-    const customer = await stripe.customers.create({
-      email: userEmail,
-      name: userName || undefined,
-    });
-    console.log('Stripe customer created:', customer.id);
-
-    // Save to database
-    console.log('Saving customer to database...');
-    const { error: insertError } = await supabase
-      .from('stripe_customers')
-      .insert({
-        user_email: userEmail,
-        stripe_customer_id: customer.id,
-      });
-
-    if (insertError) {
-      console.error('Customer save error:', insertError);
-    } else {
-      console.log('Customer saved to database successfully');
-    }
-
-    return customer.id;
-  } catch (error) {
-    console.error('getOrCreateStripeCustomer error:', error);
-    throw error;
+  if (existingCustomer) {
+    return existingCustomer.stripe_customer_id;
   }
+
+  // Create new Stripe customer
+  const stripe = getStripeServer();
+  const customer = await stripe.customers.create({
+    email: userEmail,
+    name: userName || undefined,
+  });
+
+  // Save to database
+  await supabase
+    .from('stripe_customers')
+    .insert({
+      user_email: userEmail,
+      stripe_customer_id: customer.id,
+    });
+
+  return customer.id;
 }
 
 // GET - Retrieve user's payment methods
 export async function GET() {
   try {
-    console.log('GET /api/payment-methods - Starting');
-    
     const session = await auth();
-    console.log('Session:', session ? 'exists' : 'null');
     
     if (!session?.user?.email) {
-      console.log('No session or email');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    console.log('User email:', session.user.email);
-
-    // Test database connection
-    const { error: testError } = await supabase
-      .from('payment_methods')
-      .select('count')
-      .limit(1);
-
-    console.log('Database test:', testError ? 'ERROR' : 'SUCCESS');
-    if (testError) {
-      console.error('Database test error:', testError);
     }
 
     const { data: paymentMethods, error } = await supabase
@@ -93,13 +54,11 @@ export async function GET() {
       .eq('user_email', session.user.email)
       .order('created_at', { ascending: false });
 
-    console.log('Query result:', error ? 'ERROR' : 'SUCCESS');
     if (error) {
       console.error('Supabase error:', error);
       return NextResponse.json({ error: 'Failed to fetch payment methods' }, { status: 500 });
     }
 
-    console.log('Payment methods found:', paymentMethods?.length || 0);
     return NextResponse.json({ paymentMethods: paymentMethods || [] });
   } catch (error) {
     console.error('API error:', error);
@@ -110,44 +69,25 @@ export async function GET() {
 // POST - Create setup intent for adding new payment method
 export async function POST() {
   try {
-    console.log('POST /api/payment-methods - Starting');
-    
     const session = await auth();
-    console.log('Session:', session ? 'exists' : 'null');
     
     if (!session?.user?.email) {
-      console.log('No session or email');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('User email:', session.user.email);
-
-    // Test Stripe connection
-    try {
-      getStripeServer();
-      console.log('Stripe instance created successfully');
-    } catch (stripeError) {
-      console.error('Stripe initialization error:', stripeError);
-      return NextResponse.json({ error: 'Stripe configuration error' }, { status: 500 });
-    }
-
     // Get or create Stripe customer
-    console.log('Getting or creating Stripe customer...');
     const customerId = await getOrCreateStripeCustomer(
       session.user.email,
       session.user.name || undefined
     );
-    console.log('Customer ID:', customerId);
 
     // Create setup intent
     const stripe = getStripeServer();
-    console.log('Creating setup intent...');
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ['card'],
       usage: 'off_session',
     });
-    console.log('Setup intent created:', setupIntent.id);
 
     return NextResponse.json({ 
       clientSecret: setupIntent.client_secret,
