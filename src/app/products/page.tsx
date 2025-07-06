@@ -85,7 +85,7 @@ export default function ProductListPage({}) {
         <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
           <h1 className="text-4xl font-extrabold mb-2 text-center">WE ARE LIVE</h1>
           <div className="text-xl mb-8 text-center italic">Don&apos;t let a good deal get by!!!</div>
-          <div className="max-w-7xl w-full px-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="max-w-7xl w-full px-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {publishedProducts.map(product => (
               <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-3 text-gray-900">
                 <Link href={`/products/${product.id}`}>
