@@ -56,7 +56,16 @@ function CheckoutFormContent({ onSuccess, onError }: Omit<CheckoutFormProps, 'cl
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement />
+      <PaymentElement 
+        options={{
+          defaultValues: {
+            billingDetails: {
+              name: '',
+              email: ''
+            }
+          }
+        }}
+      />
       <button
         type="submit"
         disabled={!stripe || isProcessing}
@@ -75,7 +84,17 @@ function CheckoutFormContent({ onSuccess, onError }: Omit<CheckoutFormProps, 'cl
 
 export default function CheckoutForm({ clientSecret, onSuccess, onError }: CheckoutFormProps) {
   return (
-    <Elements stripe={stripePromise} options={{ clientSecret }}>
+    <Elements 
+      stripe={stripePromise} 
+      options={{ 
+        clientSecret,
+        appearance: {
+          theme: 'stripe',
+        },
+        // Enable saved payment methods
+        locale: 'en'
+      }}
+    >
       <CheckoutFormContent onSuccess={onSuccess} onError={onError} />
     </Elements>
   );

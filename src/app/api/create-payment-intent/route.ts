@@ -127,6 +127,15 @@ export async function POST(request: NextRequest) {
       session.user.email,
       session.user.name || undefined
     );
+    console.log('Customer ID for payment intent:', customerId);
+
+    // Debug: Check if customer has saved payment methods
+    const { data: savedPaymentMethods } = await supabase
+      .from('payment_methods')
+      .select('*')
+      .eq('user_email', session.user.email);
+    
+    console.log('Saved payment methods for user:', savedPaymentMethods);
 
     // ───────────────────────────────────────────────
     // 6. Create PaymentIntent with customer ID
@@ -158,6 +167,8 @@ export async function POST(request: NextRequest) {
       },
       automatic_payment_methods: { enabled: true },
     });
+
+    console.log('Payment intent created:', paymentIntent.id, 'with customer:', paymentIntent.customer);
 
     // ───────────────────────────────────────────────
     // 7. TODO: Insert a pending order row if you track orders in Supabase
