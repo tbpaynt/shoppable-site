@@ -5,10 +5,11 @@ import { useSession, signOut } from 'next-auth/react';
 import { useState, useRef, useEffect } from 'react';
 
 export default function Navbar() {
-  const { cart } = useCart();
+  const { cart, cartAnimationTrigger } = useCart();
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const { data: session, status } = useSession();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isCartAnimating, setIsCartAnimating] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -24,6 +25,15 @@ export default function Navbar() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Animate cart icon when items are added
+  useEffect(() => {
+    if (cartAnimationTrigger > 0) {
+      setIsCartAnimating(true);
+      const timer = setTimeout(() => setIsCartAnimating(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [cartAnimationTrigger]);
 
   const handleSignOut = () => {
     setIsDropdownOpen(false);
@@ -116,11 +126,11 @@ export default function Navbar() {
           </>
         )}
         <Link href="/cart" className="relative flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-7 h-7 transition-transform duration-300 ${isCartAnimating ? 'animate-bounce scale-110' : ''}`}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437m0 0L7.5 15.75A2.25 2.25 0 009.664 18h7.672a2.25 2.25 0 002.164-1.75l1.386-7.75H6.106m-1.25-3.728L6.106 6.25m0 0h15.138" />
           </svg>
           {itemCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 font-bold">{itemCount}</span>
+            <span className={`absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 font-bold transition-transform duration-300 ${isCartAnimating ? 'animate-pulse scale-125' : ''}`}>{itemCount}</span>
           )}
         </Link>
       </div>

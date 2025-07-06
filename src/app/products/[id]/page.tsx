@@ -15,6 +15,7 @@ export default function ProductDetailPage() {
   const [categoryName, setCategoryName] = useState("");
   const [images, setImages] = useState<{ image_url: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -47,6 +48,26 @@ export default function ProductDetailPage() {
     })();
   }, [id]);
 
+  const handleAddToCart = () => {
+    if (!product) return;
+    
+    setIsAnimating(true);
+    addToCart({ 
+      id: product.id, 
+      name: product.name, 
+      image: product.image, 
+      price: product.price, 
+      shipping_cost: product.shipping_cost ?? 0 
+    });
+    
+    setTimeout(() => setIsAnimating(false), 300);
+  };
+
+  const handleBuyNow = () => {
+    handleAddToCart();
+    router.push('/cart');
+  };
+
   if (loading) return <div className="p-8 text-white">Loading...</div>;
   if (!product) return <div className="p-8 text-red-600">Product not found.</div>;
 
@@ -75,8 +96,20 @@ export default function ProductDetailPage() {
       )}
       <div className="mb-6 whitespace-pre-line">{product.description}</div>
       <div className="flex gap-4 mt-6">
-        <button className="bg-blue-600 text-white px-6 py-2 rounded text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })} disabled={product.stock === 0}>Add to Cart</button>
-        <button className="bg-green-600 text-white px-6 py-2 rounded text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }} disabled={product.stock === 0}>Buy</button>
+        <button 
+          className={`bg-blue-600 text-white px-6 py-2 rounded text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-transform duration-200 ${isAnimating ? 'animate-button-bounce' : ''}`}
+          onClick={handleAddToCart} 
+          disabled={product.stock === 0}
+        >
+          Add to Cart
+        </button>
+        <button 
+          className={`bg-green-600 text-white px-6 py-2 rounded text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-transform duration-200 ${isAnimating ? 'animate-button-bounce' : ''}`}
+          onClick={handleBuyNow} 
+          disabled={product.stock === 0}
+        >
+          Buy
+        </button>
       </div>
     </div>
   );

@@ -19,6 +19,9 @@ type CartContextType = {
   cartTotal: number;
   cartItemCount: number;
   shippingTotal: number;
+  cartAnimationTrigger: number;
+  showToast: boolean;
+  toastMessage: string;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -31,6 +34,9 @@ export function useCart() {
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartAnimationTrigger, setCartAnimationTrigger] = useState(0);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   // Load cart from localStorage
   useEffect(() => {
@@ -51,6 +57,14 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       }
       return [...prev, { ...item, quantity: 1 }];
     });
+    
+    // Trigger animations
+    setCartAnimationTrigger(prev => prev + 1);
+    setToastMessage(`${item.name} added to cart!`);
+    setShowToast(true);
+    
+    // Hide toast after 3 seconds
+    setTimeout(() => setShowToast(false), 3000);
   };
 
   const removeFromCart = (id: number) => {
@@ -69,7 +83,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, cartItemCount, shippingTotal }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, cartItemCount, shippingTotal, cartAnimationTrigger, showToast, toastMessage }}>
       {children}
     </CartContext.Provider>
   );

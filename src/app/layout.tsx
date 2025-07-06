@@ -2,6 +2,7 @@ import "./globals.css";
 import SessionWrapper from "./SessionWrapper";
 import { CartProvider } from "./CartContext";
 import Navbar from "./Navbar";
+import Toast from "./components/Toast";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SessionWrapper>
           <CartProvider>
             <Navbar />
+            <Toast />
             {children}
           </CartProvider>
         </SessionWrapper>

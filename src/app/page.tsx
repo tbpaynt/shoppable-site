@@ -23,6 +23,7 @@ export default function HomePage() {
   const [products, setProducts] = React.useState<Product[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
+  const [animatingButtons, setAnimatingButtons] = useState<Set<number>>(new Set());
 
   React.useEffect(() => {
     (async () => {
@@ -51,6 +52,34 @@ export default function HomePage() {
   const countdown = goLiveDate ? formatCountdown(goLiveDate.getTime() - now.getTime()) : null;
 
   const publishedProducts = products.filter(product => product.published);
+
+  const handleAddToCart = (product: Product) => {
+    // Add button animation
+    setAnimatingButtons(prev => new Set([...prev, product.id]));
+    
+    // Add to cart
+    addToCart({ 
+      id: product.id, 
+      name: product.name, 
+      image: product.image, 
+      price: product.price, 
+      shipping_cost: product.shipping_cost ?? 0 
+    });
+    
+    // Remove animation after 300ms
+    setTimeout(() => {
+      setAnimatingButtons(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(product.id);
+        return newSet;
+      });
+    }, 300);
+  };
+
+  const handleBuyNow = (product: Product) => {
+    handleAddToCart(product);
+    router.push('/cart');
+  };
 
   return (
     <div className="max-w-full min-h-screen" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'}}>
@@ -103,8 +132,20 @@ export default function HomePage() {
                   )}
                 </Link>
                 <div className="flex gap-1 mt-3">
-                  <button className="bg-blue-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })} disabled={product.stock === 0}>Add to Cart</button>
-                  <button className="bg-green-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }} disabled={product.stock === 0}>Buy</button>
+                  <button 
+                    className={`bg-blue-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50 transition-transform duration-200 ${animatingButtons.has(product.id) ? 'animate-button-bounce' : ''}`}
+                    onClick={() => handleAddToCart(product)} 
+                    disabled={product.stock === 0}
+                  >
+                    Add to Cart
+                  </button>
+                  <button 
+                    className={`bg-green-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50 transition-transform duration-200 ${animatingButtons.has(product.id) ? 'animate-button-bounce' : ''}`}
+                    onClick={() => handleBuyNow(product)} 
+                    disabled={product.stock === 0}
+                  >
+                    Buy
+                  </button>
                 </div>
               </div>
             ))}
