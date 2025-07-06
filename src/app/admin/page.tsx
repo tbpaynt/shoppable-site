@@ -49,7 +49,7 @@ export default function AdminPage() {
   const [goLiveLoading, setGoLiveLoading] = useState(false);
 
   // Admin panel view management
-  type AdminView = 'products' | 'orders';
+  type AdminView = 'products' | 'orders' | 'bulk-import';
   const [view, setView] = useState<AdminView>('products');
 
   // Orders state
@@ -69,6 +69,15 @@ export default function AdminPage() {
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
+
+  // Bulk import state
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [bulkImportProgress, setBulkImportProgress] = useState(0);
+  const [bulkImportErrors, setBulkImportErrors] = useState<string[]>([]);
+  const [bulkImportLoading, setBulkImportLoading] = useState(false);
+  const [bulkProducts, setBulkProducts] = useState<Array<Omit<Product, 'id'> & { category_id?: number; temp_id: string }>>([]);
+  const [showBulkForm, setShowBulkForm] = useState(false);
+  const [bulkProductImages, setBulkProductImages] = useState<{ [key: string]: File | null }>({});
 
   // Handle email/password login
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -257,6 +266,240 @@ export default function AdminPage() {
     setGoLiveLoading(false);
   };
 
+  // Bulk import functions
+  const handleBulkImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkImportFile(file);
+    setBulkImportErrors([]);
+    setBulkImportLoading(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        setBulkImportErrors(['CSV file must have at least a header row and one data row']);
+        setBulkImportLoading(false);
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      const dataLines = lines.slice(1);
+      
+      const requiredHeaders = ['listing_number', 'name', 'price', 'retail', 'description'];
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      
+      if (missingHeaders.length > 0) {
+        setBulkImportErrors([`Missing required columns: ${missingHeaders.join(', ')}`]);
+        setBulkImportLoading(false);
+        return;
+      }
+
+      const products: Array<Omit<Product, 'id'> & { category_id?: number; temp_id: string }> = [];
+      const errors: string[] = [];
+
+      dataLines.forEach((line, index) => {
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        const product: any = { temp_id: `temp_${Date.now()}_${index}` };
+        
+        headers.forEach((header, idx) => {
+          const value = values[idx] || '';
+          
+          switch (header) {
+            case 'listing_number':
+            case 'name':
+            case 'description':
+            case 'image':
+              product[header] = value;
+              break;
+            case 'price':
+            case 'retail':
+            case 'shipping_cost':
+              product[header] = parseFloat(value) || 0;
+              break;
+            case 'weight_oz':
+            case 'stock':
+              product[header] = parseInt(value) || 0;
+              break;
+            case 'category_id':
+              product[header] = parseInt(value) || undefined;
+              break;
+            case 'published':
+              product[header] = value.toLowerCase() === 'true' || value === '1';
+              break;
+            case 'countdown':
+              product[header] = value ? new Date(value) : new Date(Date.now() + 1000 * 60 * 60);
+              break;
+            default:
+              // Ignore unknown columns
+              break;
+          }
+        });
+
+        // Set defaults for required fields
+        if (!product.listing_number) {
+          errors.push(`Row ${index + 2}: Missing listing_number`);
+          return;
+        }
+        if (!product.name) {
+          errors.push(`Row ${index + 2}: Missing name`);
+          return;
+        }
+        if (!product.price) {
+          errors.push(`Row ${index + 2}: Missing or invalid price`);
+          return;
+        }
+        if (!product.retail) {
+          errors.push(`Row ${index + 2}: Missing or invalid retail price`);
+          return;
+        }
+
+        // Set defaults
+        product.shipping_cost = product.shipping_cost || 0;
+        product.weight_oz = product.weight_oz || 0;
+        product.stock = product.stock || 0;
+        product.description = product.description || '';
+        product.image = product.image || '';
+        product.published = product.published || false;
+        product.countdown = product.countdown || new Date(Date.now() + 1000 * 60 * 60);
+
+        products.push(product);
+      });
+
+      if (errors.length > 0) {
+        setBulkImportErrors(errors);
+      } else {
+        setBulkProducts(products);
+        setBulkImportErrors([]);
+      }
+    } catch (error) {
+      setBulkImportErrors(['Error parsing CSV file. Please check the format.']);
+    }
+
+    setBulkImportLoading(false);
+  };
+
+  const handleBulkSubmit = async () => {
+    if (bulkProducts.length === 0) return;
+
+    setBulkImportLoading(true);
+    setBulkImportProgress(0);
+    setBulkImportErrors([]);
+
+    const results: Product[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < bulkProducts.length; i++) {
+      const product = bulkProducts[i];
+      
+      try {
+        const { temp_id, ...productData } = product;
+        let imageUrl = productData.image;
+
+        // Upload image if file is selected
+        const imageFile = bulkProductImages[temp_id];
+        if (imageFile) {
+          const fileExt = imageFile.name.split('.').pop();
+          const fileName = `${Date.now()}_${temp_id}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(fileName, imageFile);
+
+          if (uploadError) {
+            errors.push(`Product "${product.name}": Image upload failed - ${uploadError.message}`);
+            setBulkImportProgress(((i + 1) / bulkProducts.length) * 100);
+            continue;
+          }
+
+          imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${fileName}`;
+        }
+
+        const res = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...productData,
+            image: imageUrl,
+            countdown: productData.countdown instanceof Date ? productData.countdown.toISOString() : productData.countdown
+          }),
+        });
+
+        if (res.ok) {
+          const created = await res.json();
+          results.push(created);
+        } else {
+          const error = await res.text();
+          errors.push(`Product "${product.name}": ${error}`);
+        }
+      } catch (error) {
+        errors.push(`Product "${product.name}": ${error}`);
+      }
+
+      setBulkImportProgress(((i + 1) / bulkProducts.length) * 100);
+    }
+
+    if (results.length > 0) {
+      setProductList(prev => [...prev, ...results]);
+    }
+
+    if (errors.length > 0) {
+      setBulkImportErrors(errors);
+    }
+
+    setBulkImportLoading(false);
+    
+    if (errors.length === 0) {
+      setBulkProducts([]);
+      setBulkImportFile(null);
+      setBulkImportProgress(0);
+      setBulkProductImages({});
+    }
+  };
+
+  const addBulkProduct = () => {
+    const newProduct = {
+      temp_id: `temp_${Date.now()}`,
+      listing_number: "",
+      name: "",
+      image: "",
+      price: 0,
+      retail: 0,
+      countdown: new Date(Date.now() + 1000 * 60 * 60),
+      stock: 0,
+      weight_oz: 0,
+      description: "",
+      shipping_cost: 0,
+      published: false,
+      category_id: undefined,
+    };
+    setBulkProducts(prev => [...prev, newProduct]);
+  };
+
+  const updateBulkProduct = (tempId: string, updates: Partial<typeof bulkProducts[0]>) => {
+    setBulkProducts(prev => prev.map(p => 
+      p.temp_id === tempId ? { ...p, ...updates } : p
+    ));
+  };
+
+  const removeBulkProduct = (tempId: string) => {
+    setBulkProducts(prev => prev.filter(p => p.temp_id !== tempId));
+    setBulkProductImages(prev => {
+      const newImages = { ...prev };
+      delete newImages[tempId];
+      return newImages;
+    });
+  };
+
+  const handleBulkProductImageChange = (tempId: string, file: File | null) => {
+    setBulkProductImages(prev => ({
+      ...prev,
+      [tempId]: file
+    }));
+  };
+
   if (status === "loading") return <div>Loading...</div>;
   
   if (status === "unauthenticated") {
@@ -409,6 +652,319 @@ export default function AdminPage() {
     );
   }
 
+  // Render BULK IMPORT view
+  if (view === 'bulk-import') {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <h1 className="text-3xl font-bold mb-6">Admin Dashboard – Bulk Import</h1>
+        <div className="mb-6">
+          <label className="mr-2 font-semibold">Select view:</label>
+          <select
+            value={view}
+            onChange={(e) => setView(e.target.value as AdminView)}
+            className="p-2 rounded text-black"
+          >
+            <option value="products">Products</option>
+            <option value="orders">Orders</option>
+            <option value="bulk-import">Bulk Import</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* CSV Upload Section */}
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h2 className="text-xl font-bold mb-4">CSV Upload</h2>
+            <div className="mb-4">
+              <p className="text-gray-300 mb-2">Upload a CSV file with the following columns:</p>
+              <div className="bg-gray-700 p-3 rounded text-sm font-mono">
+                listing_number, name, price, retail, description, image, shipping_cost, weight_oz, stock, category_id, published, countdown
+              </div>
+              <p className="text-gray-400 text-sm mt-2">
+                * Required: listing_number, name, price, retail, description<br/>
+                * published: true/false or 1/0<br/>
+                * countdown: ISO date string (optional)<br/>
+                * image: Leave blank or use URL - you can upload images individually in the form below
+              </p>
+              <button
+                onClick={() => {
+                  const headers = "listing_number,name,price,retail,description,image,shipping_cost,weight_oz,stock,category_id,published,countdown\n";
+                  const sample = "A001,Sample Product,19.99,39.99,A great product,https://example.com/image.jpg,5.00,16,10,1,true,2024-12-31T23:59:59Z\n";
+                  const csvContent = headers + sample;
+                  const blob = new Blob([csvContent], { type: 'text/csv' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'bulk_import_template.csv';
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                }}
+                className="mt-2 bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+              >
+                Download Template CSV
+              </button>
+            </div>
+            
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleBulkImportFile}
+              className="mb-4 p-2 w-full text-white bg-gray-700 rounded"
+              disabled={bulkImportLoading}
+            />
+
+            {bulkImportFile && (
+              <div className="mb-4">
+                <p className="text-green-400">File loaded: {bulkImportFile.name}</p>
+                <p className="text-gray-300">{bulkProducts.length} products found</p>
+              </div>
+            )}
+
+            {bulkImportErrors.length > 0 && (
+              <div className="mb-4 p-3 bg-red-900 rounded">
+                <h3 className="font-bold text-red-200 mb-2">Errors:</h3>
+                {bulkImportErrors.map((error, idx) => (
+                  <div key={idx} className="text-red-200 text-sm">{error}</div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Manual Bulk Form Section */}
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h2 className="text-xl font-bold mb-4">Manual Bulk Entry</h2>
+            <p className="text-gray-300 mb-4">Add multiple products manually using the form below.</p>
+            
+            <button
+              onClick={addBulkProduct}
+              className="bg-blue-600 text-white px-4 py-2 rounded mb-4 hover:bg-blue-700"
+              disabled={bulkImportLoading}
+            >
+              Add Product Form
+            </button>
+
+            {bulkProducts.length > 0 && (
+              <div className="mb-4">
+                <p className="text-green-400">{bulkProducts.length} products ready for import</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        {bulkImportLoading && (
+          <div className="mt-6 bg-gray-800 p-4 rounded">
+            <div className="flex justify-between items-center mb-2">
+              <span>Importing Products...</span>
+              <span>{Math.round(bulkImportProgress)}%</span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${bulkImportProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Products Preview/Edit */}
+        {bulkProducts.length > 0 && (
+          <div className="mt-8 bg-gray-800 p-6 rounded-lg">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Products to Import ({bulkProducts.length})</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleBulkSubmit}
+                  className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+                  disabled={bulkImportLoading || bulkProducts.length === 0}
+                >
+                  {bulkImportLoading ? 'Importing...' : 'Import All Products'}
+                </button>
+                <button
+                  onClick={() => setBulkProducts([])}
+                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                  disabled={bulkImportLoading}
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto">
+              {bulkProducts.map((product, index) => (
+                <div key={product.temp_id} className="bg-gray-700 p-4 rounded mb-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-bold text-lg">Product {index + 1}</h3>
+                    <button
+                      onClick={() => removeBulkProduct(product.temp_id)}
+                      className="text-red-400 hover:text-red-300"
+                      disabled={bulkImportLoading}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Listing Number*</label>
+                      <input
+                        type="text"
+                        value={product.listing_number}
+                        onChange={(e) => updateBulkProduct(product.temp_id, { listing_number: e.target.value })}
+                        className="w-full p-2 bg-gray-600 text-white rounded text-sm"
+                        disabled={bulkImportLoading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Name*</label>
+                      <input
+                        type="text"
+                        value={product.name}
+                        onChange={(e) => updateBulkProduct(product.temp_id, { name: e.target.value })}
+                        className="w-full p-2 bg-gray-600 text-white rounded text-sm"
+                        disabled={bulkImportLoading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Category</label>
+                      <select
+                        value={product.category_id || ''}
+                        onChange={(e) => updateBulkProduct(product.temp_id, { category_id: e.target.value ? Number(e.target.value) : undefined })}
+                        className="w-full p-2 bg-gray-600 text-white rounded text-sm"
+                        disabled={bulkImportLoading}
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Price*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={product.price}
+                        onChange={(e) => updateBulkProduct(product.temp_id, { price: parseFloat(e.target.value) || 0 })}
+                        className="w-full p-2 bg-gray-600 text-white rounded text-sm"
+                        disabled={bulkImportLoading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Retail*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={product.retail}
+                        onChange={(e) => updateBulkProduct(product.temp_id, { retail: parseFloat(e.target.value) || 0 })}
+                        className="w-full p-2 bg-gray-600 text-white rounded text-sm"
+                        disabled={bulkImportLoading}
+                      />
+                    </div>
+                                         <div>
+                       <label className="block text-sm font-medium mb-1">Stock</label>
+                       <input
+                         type="number"
+                         min="0"
+                         value={product.stock}
+                         onChange={(e) => updateBulkProduct(product.temp_id, { stock: parseInt(e.target.value) || 0 })}
+                         className="w-full p-2 bg-gray-600 text-white rounded text-sm"
+                         disabled={bulkImportLoading}
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-sm font-medium mb-1">Shipping Cost</label>
+                       <input
+                         type="number"
+                         min="0"
+                         step="0.01"
+                         value={product.shipping_cost}
+                         onChange={(e) => updateBulkProduct(product.temp_id, { shipping_cost: parseFloat(e.target.value) || 0 })}
+                         className="w-full p-2 bg-gray-600 text-white rounded text-sm"
+                         disabled={bulkImportLoading}
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-sm font-medium mb-1">Weight</label>
+                       <div className="flex gap-2 items-center">
+                         <input
+                           type="number"
+                           min="0"
+                           step="1"
+                           placeholder="lbs"
+                           value={Math.floor(((product.weight_oz ?? 0) / 16))}
+                           onChange={(e) => {
+                             const lbs = parseInt(e.target.value) || 0;
+                             const oz = (product.weight_oz ?? 0) % 16;
+                             updateBulkProduct(product.temp_id, { weight_oz: lbs * 16 + oz });
+                           }}
+                           className="w-20 p-2 bg-gray-600 text-white rounded text-sm"
+                           disabled={bulkImportLoading}
+                         />
+                         <span className="text-gray-300 text-sm">lbs</span>
+                         <input
+                           type="number"
+                           min="0"
+                           max="15.9"
+                           step="0.1"
+                           placeholder="oz"
+                           value={(((product.weight_oz ?? 0) % 16).toFixed(1))}
+                           onChange={(e) => {
+                             const oz = parseFloat(e.target.value) || 0;
+                             const lbs = Math.floor((product.weight_oz ?? 0) / 16);
+                             updateBulkProduct(product.temp_id, { weight_oz: lbs * 16 + oz });
+                           }}
+                           className="w-20 p-2 bg-gray-600 text-white rounded text-sm"
+                           disabled={bulkImportLoading}
+                         />
+                         <span className="text-gray-300 text-sm">oz</span>
+                       </div>
+                     </div>
+                   </div>
+                   
+                   <div className="mt-3">
+                     <label className="block text-sm font-medium mb-1">Product Image</label>
+                     <input
+                       type="file"
+                       accept="image/*"
+                       onChange={(e) => handleBulkProductImageChange(product.temp_id, e.target.files?.[0] || null)}
+                       className="w-full p-2 bg-gray-600 text-white rounded text-sm mb-2"
+                       disabled={bulkImportLoading}
+                     />
+                     
+                     {/* Image Preview */}
+                     {bulkProductImages[product.temp_id] && (
+                       <div className="mb-3">
+                         <img
+                           src={URL.createObjectURL(bulkProductImages[product.temp_id]!)}
+                           alt="Preview"
+                           className="h-20 w-20 object-cover rounded border"
+                         />
+                         <p className="text-xs text-gray-300 mt-1">
+                           {bulkProductImages[product.temp_id]!.name}
+                         </p>
+                       </div>
+                     )}
+                     
+                     <label className="block text-sm font-medium mb-1">Description</label>
+                     <textarea
+                       value={product.description}
+                       onChange={(e) => updateBulkProduct(product.temp_id, { description: e.target.value })}
+                       className="w-full p-2 bg-gray-600 text-white rounded text-sm"
+                       rows={2}
+                       disabled={bulkImportLoading}
+                     />
+                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
@@ -423,6 +979,7 @@ export default function AdminPage() {
         >
           <option value="products">Products</option>
           <option value="orders">Orders</option>
+          <option value="bulk-import">Bulk Import</option>
         </select>
       </div>
 

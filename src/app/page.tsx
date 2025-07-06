@@ -32,6 +32,10 @@ export default function HomePage() {
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all');
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'newest'>('name_asc');
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  
+  // Bulk selection and quantity state
+  const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
+  const [quantities, setQuantities] = useState<{ [key: number]: number }>({});
 
   React.useEffect(() => {
     (async () => {
@@ -117,9 +121,12 @@ export default function HomePage() {
     return filtered;
   }, [products, searchTerm, selectedCategory, stockFilter, sortBy]);
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (product: Product, quantity?: number) => {
     // Add button animation
     setAnimatingButtons(prev => new Set([...prev, product.id]));
+    
+    // Get quantity from selector or use provided quantity
+    const qty = quantity || quantities[product.id] || 1;
     
     // Add to cart
     addToCart({ 
@@ -128,7 +135,7 @@ export default function HomePage() {
       image: product.image, 
       price: product.price, 
       shipping_cost: product.shipping_cost ?? 0 
-    });
+    }, qty);
     
     // Remove animation after 300ms
     setTimeout(() => {
@@ -143,6 +150,44 @@ export default function HomePage() {
   const handleBuyNow = (product: Product) => {
     handleAddToCart(product);
     router.push('/cart');
+  };
+
+  const handleProductSelection = (productId: number, selected: boolean) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(productId);
+      } else {
+        newSet.delete(productId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleQuantityChange = (productId: number, quantity: number) => {
+    setQuantities(prev => ({
+      ...prev,
+      [productId]: Math.max(1, quantity)
+    }));
+  };
+
+  const handleBulkAddToCart = () => {
+    selectedProducts.forEach(productId => {
+      const product = filteredAndSortedProducts.find(p => p.id === productId);
+      if (product && product.stock > 0) {
+        handleAddToCart(product);
+      }
+    });
+    setSelectedProducts(new Set());
+  };
+
+  const handleSelectAll = () => {
+    const inStockProducts = filteredAndSortedProducts.filter(p => p.stock > 0);
+    setSelectedProducts(new Set(inStockProducts.map(p => p.id)));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedProducts(new Set());
   };
 
   return (
