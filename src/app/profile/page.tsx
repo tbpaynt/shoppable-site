@@ -293,7 +293,7 @@ export default function ProfilePage() {
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                     />
                   </div>
                   <div>
@@ -313,7 +313,7 @@ export default function ProfilePage() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="(555) 123-4567"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                     />
                   </div>
                   <button
@@ -414,7 +414,7 @@ export default function ProfilePage() {
                           value={newAddress.name}
                           onChange={(e) => setNewAddress({...newAddress, name: e.target.value})}
                           required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -424,7 +424,7 @@ export default function ProfilePage() {
                           value={newAddress.street1}
                           onChange={(e) => setNewAddress({...newAddress, street1: e.target.value})}
                           required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -433,7 +433,7 @@ export default function ProfilePage() {
                           type="text"
                           value={newAddress.street2}
                           onChange={(e) => setNewAddress({...newAddress, street2: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         />
                       </div>
                       <div>
@@ -443,7 +443,7 @@ export default function ProfilePage() {
                           value={newAddress.city}
                           onChange={(e) => setNewAddress({...newAddress, city: e.target.value})}
                           required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         />
                       </div>
                       <div>
@@ -453,7 +453,7 @@ export default function ProfilePage() {
                           value={newAddress.state}
                           onChange={(e) => setNewAddress({...newAddress, state: e.target.value})}
                           required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         />
                       </div>
                       <div>
@@ -463,7 +463,7 @@ export default function ProfilePage() {
                           value={newAddress.zip}
                           onChange={(e) => setNewAddress({...newAddress, zip: e.target.value})}
                           required
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         />
                       </div>
                       <div>
@@ -471,7 +471,7 @@ export default function ProfilePage() {
                         <select
                           value={newAddress.country}
                           onChange={(e) => setNewAddress({...newAddress, country: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         >
                           <option value="US">United States</option>
                           <option value="CA">Canada</option>
