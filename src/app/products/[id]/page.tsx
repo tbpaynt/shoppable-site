@@ -70,10 +70,13 @@ export default function ProductDetailPage() {
         <span className="text-lg line-through text-gray-500">${product.retail.toFixed(2)}</span>
       </div>
       <div className="mb-4">Stock: {product.stock ?? 0}</div>
+      {product.stock === 0 && (
+        <div className="mb-4 text-red-600 font-bold text-xl">Sold Out</div>
+      )}
       <div className="mb-6 whitespace-pre-line">{product.description}</div>
       <div className="flex gap-4 mt-6">
-        <button className="bg-blue-600 text-white px-6 py-2 rounded text-lg font-semibold" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })}>Add to Cart</button>
-        <button className="bg-green-600 text-white px-6 py-2 rounded text-lg font-semibold" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }}>Buy</button>
+        <button className="bg-blue-600 text-white px-6 py-2 rounded text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })} disabled={product.stock === 0}>Add to Cart</button>
+        <button className="bg-green-600 text-white px-6 py-2 rounded text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }} disabled={product.stock === 0}>Buy</button>
       </div>
     </div>
   );
