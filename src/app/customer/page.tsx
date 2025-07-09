@@ -51,7 +51,7 @@ export default function CustomerPanel() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Deals You Snagged</h1>
         <PurchaseHistory userEmail={session.user.email} />
       </div>
     </div>
