@@ -25,7 +25,7 @@ export default function HomePage() {
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const [animatingButtons, setAnimatingButtons] = useState<Set<number>>(new Set());
-  const [cartError, setCartError] = useState<string | null>(null);
+  const [productErrors, setProductErrors] = useState<Map<number, string>>(new Map());
 
   // Search and filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -134,11 +134,21 @@ export default function HomePage() {
     
     // Handle result
     if (!result.success) {
-      setCartError(result.message);
+      setProductErrors(prev => new Map(prev.set(product.id, result.message)));
       // Clear error after 3 seconds
-      setTimeout(() => setCartError(null), 3000);
+      setTimeout(() => {
+        setProductErrors(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(product.id);
+          return newMap;
+        });
+      }, 3000);
     } else {
-      setCartError(null);
+      setProductErrors(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(product.id);
+        return newMap;
+      });
     }
     
     // Remove animation after 300ms
@@ -192,14 +202,7 @@ export default function HomePage() {
           <h1 className="text-4xl font-extrabold mb-2 text-center">WE ARE LIVE</h1>
           <div className="text-xl mb-8 text-center italic">Don&apos;t let a good deal get by!!!</div>
           
-          {/* Cart Error Message */}
-          {cartError && (
-            <div className="max-w-7xl w-full px-4 mb-4">
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                {cartError}
-              </div>
-            </div>
-          )}
+
           
           {/* Search and Filter Section */}
           <div className="max-w-7xl w-full px-4 mb-4">
@@ -406,6 +409,12 @@ export default function HomePage() {
                     <div className="mt-2 text-red-600 font-bold text-sm">Sold Out</div>
                   )}
                 </Link>
+                {/* Product-specific error message */}
+                {productErrors.has(product.id) && (
+                  <div className="mt-2 mb-2 bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded text-xs">
+                    {productErrors.get(product.id)}
+                  </div>
+                )}
                 <div className="flex gap-1 mt-3">
                   <button 
                     className={`bg-blue-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50 transition-transform duration-200 ${animatingButtons.has(product.id) ? 'animate-button-bounce' : ''}`}
