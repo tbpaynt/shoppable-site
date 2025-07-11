@@ -17,13 +17,16 @@ const parseId = (idParam: string) => {
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: idParam } = await params;
   try {
+    const id = parseId(idParam);
+
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .eq("id", params.id)
+      .eq("id", id)
       .single();
 
     if (error) throw error;
