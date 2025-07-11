@@ -13,6 +13,7 @@ export default function CartPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [quantityError, setQuantityError] = useState<string | null>(null);
   
   // Address state for shipping quote
   const [address, setAddress] = useState({
@@ -286,17 +287,42 @@ export default function CartPage() {
             <tbody>
               {cart.map(item => (
                 <tr key={item.id} className="border-t border-gray-200">
-                  <td className="p-2"><Image src={item.image} alt={item.name} width={48} height={48} className="h-12 w-12 object-cover rounded" /></td>
+                  <td className="p-2">
+                    {item.image && item.image.trim() !== '' ? (
+                      <Image src={item.image} alt={item.name} width={48} height={48} className="h-12 w-12 object-cover rounded" />
+                    ) : (
+                      <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center">
+                        <span className="text-gray-500 text-xs">No Img</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="p-2">{item.name}</td>
                   <td className="p-2">${item.price.toFixed(2)}</td>
                   <td className="p-2">
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={e => updateQuantity(item.id, parseInt(e.target.value) || 1)}
-                      className="w-16 p-1 border rounded text-black"
-                    />
+                    <div className="flex flex-col">
+                      <input
+                        type="number"
+                        min={1}
+                        max={item.stock || 999}
+                        value={item.quantity}
+                        onChange={async (e) => {
+                          const newQuantity = parseInt(e.target.value) || 1;
+                          const result = await updateQuantity(item.id, newQuantity);
+                          if (!result.success) {
+                            setQuantityError(result.message);
+                            setTimeout(() => setQuantityError(null), 3000);
+                          } else {
+                            setQuantityError(null);
+                          }
+                        }}
+                        className="w-16 p-1 border rounded text-black"
+                      />
+                      {item.stock && (
+                        <span className="text-xs text-gray-600 mt-1">
+                          {item.stock} in stock
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="p-2">${(item.price * item.quantity).toFixed(2)}</td>
                   <td className="p-2">
@@ -313,6 +339,11 @@ export default function CartPage() {
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
               {error}
+            </div>
+          )}
+          {quantityError && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {quantityError}
             </div>
           )}
           <button 

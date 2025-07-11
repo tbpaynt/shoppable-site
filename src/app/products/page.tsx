@@ -89,7 +89,13 @@ export default function ProductListPage({}) {
             {publishedProducts.map(product => (
               <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-3 text-gray-900">
                 <Link href={`/products/${product.id}`}>
-                  <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
+                  {product.image && product.image.trim() !== '' ? (
+                    <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
+                  ) : (
+                    <div className="h-32 w-full bg-gray-200 rounded mb-3 flex items-center justify-center">
+                      <span className="text-gray-500 text-sm">No Image</span>
+                    </div>
+                  )}
                   <div className="font-semibold text-base mb-1">{product.name}</div>
                   <div className="mb-1 text-gray-600 text-sm">Listing #: {product.listing_number}</div>
                   <div className="mb-1 text-gray-600 text-sm">Stock: {product.stock ?? 0}</div>
@@ -103,8 +109,13 @@ export default function ProductListPage({}) {
                   )}
                 </Link>
                 <div className="flex gap-1 mt-3">
-                  <button className="bg-blue-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50" onClick={() => addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 })} disabled={product.stock === 0}>Add to Cart</button>
-                  <button className="bg-green-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50" onClick={() => { addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); router.push('/cart'); }} disabled={product.stock === 0}>Buy</button>
+                  <button className="bg-blue-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50" onClick={async () => {
+                    await addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 });
+                  }} disabled={product.stock === 0}>Add to Cart</button>
+                  <button className="bg-green-600 text-white px-2 py-1 rounded text-sm disabled:opacity-50" onClick={async () => { 
+                    await addToCart({ id: product.id, name: product.name, image: product.image, price: product.price, shipping_cost: product.shipping_cost ?? 0 }); 
+                    router.push('/cart'); 
+                  }} disabled={product.stock === 0}>Buy</button>
                 </div>
               </div>
             ))}

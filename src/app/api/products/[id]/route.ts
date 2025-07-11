@@ -17,26 +17,25 @@ const parseId = (idParam: string) => {
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id: idParam } = await params;
   try {
-    const id = parseId(idParam);
-
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .eq("id", id)
+      .eq("id", params.id)
       .single();
 
     if (error) throw error;
-
+    
+    if (!data) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+    
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching product:", error);
-    return NextResponse.json({ error: "Error fetching product" }, {
-      status: 500,
-    });
+    return NextResponse.json({ error: "Error fetching product" }, { status: 500 });
   }
 }
 

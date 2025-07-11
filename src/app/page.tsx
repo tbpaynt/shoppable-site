@@ -25,6 +25,7 @@ export default function HomePage() {
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const [animatingButtons, setAnimatingButtons] = useState<Set<number>>(new Set());
+  const [cartError, setCartError] = useState<string | null>(null);
 
   // Search and filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,18 +119,27 @@ export default function HomePage() {
     return filtered;
   }, [products, searchTerm, selectedCategory, stockFilter, sortBy]);
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = async (product: Product) => {
     // Add button animation
     setAnimatingButtons(prev => new Set([...prev, product.id]));
     
-    // Add to cart
-    addToCart({ 
+    // Add to cart with stock validation
+    const result = await addToCart({ 
       id: product.id, 
       name: product.name, 
       image: product.image, 
       price: product.price, 
       shipping_cost: product.shipping_cost ?? 0 
     });
+    
+    // Handle result
+    if (!result.success) {
+      setCartError(result.message);
+      // Clear error after 3 seconds
+      setTimeout(() => setCartError(null), 3000);
+    } else {
+      setCartError(null);
+    }
     
     // Remove animation after 300ms
     setTimeout(() => {
@@ -181,6 +191,15 @@ export default function HomePage() {
         <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
           <h1 className="text-4xl font-extrabold mb-2 text-center">WE ARE LIVE</h1>
           <div className="text-xl mb-8 text-center italic">Don&apos;t let a good deal get by!!!</div>
+          
+          {/* Cart Error Message */}
+          {cartError && (
+            <div className="max-w-7xl w-full px-4 mb-4">
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                {cartError}
+              </div>
+            </div>
+          )}
           
           {/* Search and Filter Section */}
           <div className="max-w-7xl w-full px-4 mb-4">

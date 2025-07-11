@@ -16,6 +16,7 @@ export default function ProductDetailPage() {
   const [images, setImages] = useState<{ image_url: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [cartError, setCartError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -48,17 +49,26 @@ export default function ProductDetailPage() {
     })();
   }, [id]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
     
     setIsAnimating(true);
-    addToCart({ 
+    const result = await addToCart({ 
       id: product.id, 
       name: product.name, 
       image: product.image, 
       price: product.price, 
       shipping_cost: product.shipping_cost ?? 0 
     });
+    
+    // Handle result
+    if (!result.success) {
+      setCartError(result.message);
+      // Clear error after 3 seconds
+      setTimeout(() => setCartError(null), 3000);
+    } else {
+      setCartError(null);
+    }
     
     setTimeout(() => setIsAnimating(false), 300);
   };
@@ -77,11 +87,23 @@ export default function ProductDetailPage() {
       <div className="mb-2 text-gray-300">Listing #: {product.listing_number}</div>
       <div className="mb-2 text-gray-300">Category: {categoryName}</div>
       <div className="mb-4 flex gap-4">
-        <Image src={product.image} alt={product.name} width={256} height={256} className="h-64 w-64 object-cover rounded border" />
+        {product.image && product.image.trim() !== '' ? (
+          <Image src={product.image} alt={product.name} width={256} height={256} className="h-64 w-64 object-cover rounded border" />
+        ) : (
+          <div className="h-64 w-64 bg-gray-700 rounded border flex items-center justify-center">
+            <span className="text-gray-400">No Image</span>
+          </div>
+        )}
         {images && images.length > 0 && (
           <div className="flex flex-col gap-2">
             {images.map((img, idx) => (
-              <Image key={idx} src={img.image_url} alt={`Product image ${idx + 2}`} width={80} height={80} className="h-20 w-20 object-cover rounded border" />
+              img.image_url && img.image_url.trim() !== '' ? (
+                <Image key={idx} src={img.image_url} alt={`Product image ${idx + 2}`} width={80} height={80} className="h-20 w-20 object-cover rounded border" />
+              ) : (
+                <div key={idx} className="h-20 w-20 bg-gray-700 rounded border flex items-center justify-center">
+                  <span className="text-gray-400 text-xs">No Img</span>
+                </div>
+              )
             ))}
           </div>
         )}
@@ -93,6 +115,11 @@ export default function ProductDetailPage() {
       <div className="mb-4 text-gray-300">Stock: {product.stock ?? 0}</div>
       {product.stock === 0 && (
         <div className="mb-4 text-red-400 font-bold text-xl">Sold Out</div>
+      )}
+      {cartError && (
+        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {cartError}
+        </div>
       )}
       <div className="mb-6 whitespace-pre-line text-gray-200">{product.description}</div>
       <div className="flex gap-4 mt-6">
