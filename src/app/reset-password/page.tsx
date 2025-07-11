@@ -66,7 +66,7 @@ function ResetPasswordForm() {
         setIsSuccess(false);
         setMessage(data.message || 'An error occurred');
       }
-    } catch (error) {
+    } catch {
       setIsSuccess(false);
       setMessage('An error occurred. Please try again.');
     } finally {

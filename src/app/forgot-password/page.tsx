@@ -1,6 +1,5 @@
 "use client";
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function ForgotPasswordPage() {
@@ -8,7 +7,6 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +31,7 @@ export default function ForgotPasswordPage() {
         setIsSuccess(false);
         setMessage(data.message || 'An error occurred');
       }
-    } catch (error) {
+    } catch {
       setIsSuccess(false);
       setMessage('An error occurred. Please try again.');
     } finally {
