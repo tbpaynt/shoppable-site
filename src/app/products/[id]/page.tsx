@@ -6,6 +6,29 @@ import { supabase } from '../../../utils/supabaseClient';
 import type { Product } from '../../products';
 import Image from 'next/image';
 
+// Helper function to validate image URLs
+function isValidImageUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    return false;
+  }
+  
+  const trimmed = url.trim();
+  
+  // Check for common invalid values
+  if (trimmed === '.' || trimmed === '..' || trimmed === '/' || trimmed.length < 4) {
+    return false;
+  }
+  
+  // Check if it's a valid URL format
+  try {
+    const urlObj = new URL(trimmed);
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+  } catch {
+    // If it's not a valid URL, check if it's a valid path that starts with /
+    return trimmed.startsWith('/') && trimmed.length > 1;
+  }
+}
+
 export default function ProductDetailPage() {
   const params = useParams();
   const id = params && typeof params.id === 'string' ? params.id : '';
@@ -87,7 +110,7 @@ export default function ProductDetailPage() {
       <div className="mb-2 text-gray-300">Listing #: {product.listing_number}</div>
       <div className="mb-2 text-gray-300">Category: {categoryName}</div>
       <div className="mb-4 flex gap-4">
-        {product.image && product.image.trim() !== '' ? (
+        {isValidImageUrl(product.image) ? (
           <Image src={product.image} alt={product.name} width={256} height={256} className="h-64 w-64 object-cover rounded border" />
         ) : (
           <div className="h-64 w-64 bg-gray-700 rounded border flex items-center justify-center">
@@ -97,7 +120,7 @@ export default function ProductDetailPage() {
         {images && images.length > 0 && (
           <div className="flex flex-col gap-2">
             {images.map((img, idx) => (
-              img.image_url && img.image_url.trim() !== '' ? (
+              isValidImageUrl(img.image_url) ? (
                 <Image key={idx} src={img.image_url} alt={`Product image ${idx + 2}`} width={80} height={80} className="h-20 w-20 object-cover rounded border" />
               ) : (
                 <div key={idx} className="h-20 w-20 bg-gray-700 rounded border flex items-center justify-center">

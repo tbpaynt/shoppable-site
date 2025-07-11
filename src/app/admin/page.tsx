@@ -21,6 +21,29 @@ function localInputValueToUTC(localValue: string) {
   return localDate.toISOString();
 }
 
+// Helper function to validate image URLs
+function isValidImageUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    return false;
+  }
+  
+  const trimmed = url.trim();
+  
+  // Check for common invalid values
+  if (trimmed === '.' || trimmed === '..' || trimmed === '/' || trimmed.length < 4) {
+    return false;
+  }
+  
+  // Check if it's a valid URL format
+  try {
+    const urlObj = new URL(trimmed);
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+  } catch {
+    // If it's not a valid URL, check if it's a valid path that starts with /
+    return trimmed.startsWith('/') && trimmed.length > 1;
+  }
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const [productList, setProductList] = useState<Product[]>([]);
@@ -1031,7 +1054,7 @@ export default function AdminPage() {
               <td className="p-2">{product.listing_number}</td>
               <td className="p-2">{typeof product.category_id === 'number' ? getCategoryName(product.category_id) : ''}</td>
               <td className="p-2">
-                {product.image && (
+                {isValidImageUrl(product.image) && (
                   <Image src={product.image} alt={product.name} width={64} height={64} className="h-16 w-16 object-cover rounded" />
                 )}
               </td>

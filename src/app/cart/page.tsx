@@ -5,6 +5,29 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import CheckoutForm from '../components/CheckoutForm';
 
+// Helper function to validate image URLs
+function isValidImageUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    return false;
+  }
+  
+  const trimmed = url.trim();
+  
+  // Check for common invalid values
+  if (trimmed === '.' || trimmed === '..' || trimmed === '/' || trimmed.length < 4) {
+    return false;
+  }
+  
+  // Check if it's a valid URL format
+  try {
+    const urlObj = new URL(trimmed);
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+  } catch {
+    // If it's not a valid URL, check if it's a valid path that starts with /
+    return trimmed.startsWith('/') && trimmed.length > 1;
+  }
+}
+
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -288,7 +311,7 @@ export default function CartPage() {
               {cart.map(item => (
                 <tr key={item.id} className="border-t border-gray-200">
                   <td className="p-2">
-                    {item.image && item.image.trim() !== '' ? (
+                    {isValidImageUrl(item.image) ? (
                       <Image src={item.image} alt={item.name} width={48} height={48} className="h-12 w-12 object-cover rounded" />
                     ) : (
                       <div className="h-12 w-12 bg-gray-200 rounded flex items-center justify-center">

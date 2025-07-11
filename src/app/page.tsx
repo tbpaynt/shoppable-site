@@ -7,6 +7,29 @@ import type { Product } from './products';
 import Image from 'next/image';
 import { supabase } from '../utils/supabaseClient';
 
+// Helper function to validate image URLs
+function isValidImageUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string' || url.trim() === '') {
+    return false;
+  }
+  
+  const trimmed = url.trim();
+  
+  // Check for common invalid values
+  if (trimmed === '.' || trimmed === '..' || trimmed === '/' || trimmed.length < 4) {
+    return false;
+  }
+  
+  // Check if it's a valid URL format
+  try {
+    const urlObj = new URL(trimmed);
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+  } catch {
+    // If it's not a valid URL, check if it's a valid path that starts with /
+    return trimmed.startsWith('/') && trimmed.length > 1;
+  }
+}
+
 function formatCountdown(diffMs: number) {
   let totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
   const days = Math.floor(totalSeconds / (60 * 60 * 24));
@@ -390,7 +413,7 @@ export default function HomePage() {
             {filteredAndSortedProducts.map(product => (
               <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-3 text-gray-900">
                 <Link href={`/products/${product.id}`}>
-                  {product.image && product.image.trim() !== '' ? (
+                  {isValidImageUrl(product.image) ? (
                     <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
                   ) : (
                     <div className="h-32 w-full bg-gray-200 rounded mb-3 flex items-center justify-center">
