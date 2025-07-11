@@ -103,6 +103,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       
       return { success: true, message: `${item.name} added to cart!` };
     } catch (error) {
+      console.error('Error adding to cart:', error);
       return { success: false, message: 'Failed to add item to cart' };
     }
   };
@@ -130,6 +131,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       
       return { success: true, message: 'Quantity updated' };
     } catch (error) {
+      console.error('Error updating quantity:', error);
       return { success: false, message: 'Failed to update quantity' };
     }
   };
