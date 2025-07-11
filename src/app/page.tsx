@@ -32,6 +32,7 @@ export default function HomePage() {
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all');
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'newest'>('name_asc');
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   React.useEffect(() => {
     (async () => {
@@ -183,84 +184,182 @@ export default function HomePage() {
           
           {/* Search and Filter Section */}
           <div className="max-w-7xl w-full px-4 mb-4">
-            <div className="bg-gray-800 rounded-lg p-4 shadow-lg">
+            {/* Mobile: Compact Layout */}
+            <div className="md:hidden">
               {/* Search Bar */}
               <div className="mb-3">
                 <input
                   type="text"
-                  placeholder="Search products by name, description, or listing number..."
-                  className="w-full px-3 py-1.5 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+                  placeholder="Search products..."
+                  className="w-full px-3 py-2 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               
-              {/* Filters Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {/* Category Filter */}
-                <div>
-                  <label className="block text-xs font-medium mb-1">Category</label>
-                  <select
-                    className="w-full px-3 py-1.5 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
-                    value={selectedCategory || ''}
-                    onChange={(e) => setSelectedCategory(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">All Categories</option>
-                    {categories.map(category => (
-                      <option key={category.id} value={category.id}>{category.name}</option>
-                    ))}
-                  </select>
-                </div>
+              {/* Compact Filter Button */}
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-700 text-white rounded text-sm border border-gray-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707v6.586a1 1 0 01-1.707.707l-4-4A1 1 0 018 16.586V14a1 1 0 00-.293-.707L1.293 6.879A1 1 0 011 6.172V4z" />
+                  </svg>
+                  Filters
+                  {(selectedCategory || stockFilter !== 'all' || sortBy !== 'name_asc') && (
+                    <span className="bg-blue-600 text-white rounded-full px-2 py-0.5 text-xs">•</span>
+                  )}
+                </button>
                 
-                {/* Stock Filter */}
-                <div>
-                  <label className="block text-xs font-medium mb-1">Availability</label>
-                  <select
-                    className="w-full px-3 py-1.5 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
-                    value={stockFilter}
-                    onChange={(e) => setStockFilter(e.target.value as 'all' | 'in_stock' | 'out_of_stock')}
-                  >
-                    <option value="all">All Items</option>
-                    <option value="in_stock">In Stock</option>
-                    <option value="out_of_stock">Out of Stock</option>
-                  </select>
-                </div>
-                
-                {/* Sort Options */}
-                <div>
-                  <label className="block text-xs font-medium mb-1">Sort By</label>
-                  <select
-                    className="w-full px-3 py-1.5 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'newest')}
-                  >
-                    <option value="name_asc">Name A-Z</option>
-                    <option value="name_desc">Name Z-A</option>
-                    <option value="price_asc">Price Low to High</option>
-                    <option value="price_desc">Price High to Low</option>
-                    <option value="newest">Newest First</option>
-                  </select>
+                <div className="text-xs text-gray-300">
+                  {filteredAndSortedProducts.length} of {products.filter(p => p.published).length} items
                 </div>
               </div>
               
-              {/* Results Count and Clear Filters */}
-              <div className="mt-3 flex justify-between items-center">
-                <div className="text-xs text-gray-300">
-                  Showing {filteredAndSortedProducts.length} of {products.filter(p => p.published).length} products
+              {/* Collapsible Filters */}
+              {showFilters && (
+                <div className="bg-gray-800 rounded-lg p-3 mb-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <select
+                        className="w-full px-2 py-1.5 rounded bg-gray-700 text-white border border-gray-600 text-sm"
+                        value={selectedCategory || ''}
+                        onChange={(e) => setSelectedCategory(e.target.value ? Number(e.target.value) : null)}
+                      >
+                        <option value="">All Categories</option>
+                        {categories.map(category => (
+                          <option key={category.id} value={category.id}>{category.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <select
+                        className="w-full px-2 py-1.5 rounded bg-gray-700 text-white border border-gray-600 text-sm"
+                        value={stockFilter}
+                        onChange={(e) => setStockFilter(e.target.value as 'all' | 'in_stock' | 'out_of_stock')}
+                      >
+                        <option value="all">All Items</option>
+                        <option value="in_stock">In Stock</option>
+                        <option value="out_of_stock">Out of Stock</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <select
+                      className="w-full px-2 py-1.5 rounded bg-gray-700 text-white border border-gray-600 text-sm"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'newest')}
+                    >
+                      <option value="name_asc">Name A-Z</option>
+                      <option value="name_desc">Name Z-A</option>
+                      <option value="price_asc">Price Low to High</option>
+                      <option value="price_desc">Price High to Low</option>
+                      <option value="newest">Newest First</option>
+                    </select>
+                  </div>
+                  
+                  {(searchTerm || selectedCategory || stockFilter !== 'all' || sortBy !== 'name_asc') && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setSelectedCategory(null);
+                        setStockFilter('all');
+                        setSortBy('name_asc');
+                        setShowFilters(false);
+                      }}
+                      className="w-full px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-xs"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
                 </div>
-                {(searchTerm || selectedCategory || stockFilter !== 'all' || sortBy !== 'name_asc') && (
-                  <button
-                    onClick={() => {
-                      setSearchTerm('');
-                      setSelectedCategory(null);
-                      setStockFilter('all');
-                      setSortBy('name_asc');
-                    }}
-                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-xs"
-                  >
-                    Clear Filters
-                  </button>
-                )}
+              )}
+            </div>
+
+            {/* Desktop: Original Layout */}
+            <div className="hidden md:block">
+              <div className="bg-gray-800 rounded-lg p-4 shadow-lg">
+                {/* Search Bar */}
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    placeholder="Search products by name, description, or listing number..."
+                    className="w-full px-3 py-1.5 rounded bg-gray-700 text-white placeholder-gray-400 border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                
+                {/* Filters Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* Category Filter */}
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Category</label>
+                    <select
+                      className="w-full px-3 py-1.5 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+                      value={selectedCategory || ''}
+                      onChange={(e) => setSelectedCategory(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">All Categories</option>
+                      {categories.map(category => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Stock Filter */}
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Availability</label>
+                    <select
+                      className="w-full px-3 py-1.5 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+                      value={stockFilter}
+                      onChange={(e) => setStockFilter(e.target.value as 'all' | 'in_stock' | 'out_of_stock')}
+                    >
+                      <option value="all">All Items</option>
+                      <option value="in_stock">In Stock</option>
+                      <option value="out_of_stock">Out of Stock</option>
+                    </select>
+                  </div>
+                  
+                  {/* Sort Options */}
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Sort By</label>
+                    <select
+                      className="w-full px-3 py-1.5 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'newest')}
+                    >
+                      <option value="name_asc">Name A-Z</option>
+                      <option value="name_desc">Name Z-A</option>
+                      <option value="price_asc">Price Low to High</option>
+                      <option value="price_desc">Price High to Low</option>
+                      <option value="newest">Newest First</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {/* Results Count and Clear Filters */}
+                <div className="mt-3 flex justify-between items-center">
+                  <div className="text-xs text-gray-300">
+                    Showing {filteredAndSortedProducts.length} of {products.filter(p => p.published).length} products
+                  </div>
+                  {(searchTerm || selectedCategory || stockFilter !== 'all' || sortBy !== 'name_asc') && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setSelectedCategory(null);
+                        setStockFilter('all');
+                        setSortBy('name_asc');
+                      }}
+                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-xs"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -269,7 +368,13 @@ export default function HomePage() {
             {filteredAndSortedProducts.map(product => (
               <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-3 text-gray-900">
                 <Link href={`/products/${product.id}`}>
-                  <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
+                  {product.image && product.image.trim() !== '' ? (
+                    <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
+                  ) : (
+                    <div className="h-32 w-full bg-gray-200 rounded mb-3 flex items-center justify-center">
+                      <span className="text-gray-500 text-sm">No Image</span>
+                    </div>
+                  )}
                   <div className="font-semibold text-base mb-1">{product.name}</div>
                   <div className="mb-1 text-gray-600 text-sm">Listing #: {product.listing_number}</div>
                   <div className="mb-1 text-gray-600 text-sm">Stock: {product.stock ?? 0}</div>
