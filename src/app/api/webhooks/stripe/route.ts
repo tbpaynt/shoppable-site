@@ -65,6 +65,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     ship_cost,
     tax_amount,
     address_to,
+    reservationId,
   } = paymentIntent.metadata as any;
   
   console.log('🔥 WEBHOOK: Parsed metadata:', { orderId, userEmail, items: !!items, address_to: !!address_to });
@@ -108,6 +109,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 
   if (itemsError) throw itemsError;
 
+  // **CRITICAL: Final stock validation before processing**
   // Fetch all needed product info in a single query (stock + weight)
   const { data: productsData, error: productsErr } = await supabase
     .from('products')
@@ -116,26 +118,51 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 
   if (productsErr) {
     console.error('Error fetching products data', productsErr);
+    throw new Error('Failed to fetch product data');
   }
 
   const productMap = new Map<number, { stock: number | null; weight_oz: number | null }>();
   (productsData || []).forEach((p) => productMap.set(p.id, { stock: p.stock, weight_oz: p.weight_oz }));
   
-
-
+  // Final stock validation - reject payment if insufficient stock
   for (const item of orderItems) {
     const prodInfo = productMap.get(item.id);
-    const currentStock = prodInfo?.stock ?? null;
-    if (currentStock !== null) {
-      const newStock = Math.max(currentStock - item.quantity, 0);
-      const { error: stockError } = await supabase
-        .from('products')
-        .update({ stock: newStock })
-        .eq('id', item.id);
+    const currentStock = prodInfo?.stock ?? 0;
+    if (currentStock < item.quantity) {
+      console.error(`❌ CRITICAL: Insufficient stock for product ${item.id}. Available: ${currentStock}, Requested: ${item.quantity}`);
+      throw new Error(`Insufficient stock for product ${item.id}`);
+    }
+  }
 
-      if (stockError) {
-        console.error('Error updating stock for product:', item.id, stockError);
-      }
+  // Update stock atomically
+  for (const item of orderItems) {
+    const prodInfo = productMap.get(item.id);
+    const currentStock = prodInfo?.stock ?? 0;
+    const newStock = Math.max(currentStock - item.quantity, 0);
+    
+    const { error: stockError } = await supabase
+      .from('products')
+      .update({ stock: newStock })
+      .eq('id', item.id);
+
+    if (stockError) {
+      console.error('Error updating stock for product:', item.id, stockError);
+      throw new Error(`Failed to update stock for product ${item.id}`);
+    }
+  }
+
+  // Clean up inventory reservations after successful stock decrement
+  if (reservationId) {
+    const { error: cleanupError } = await supabase
+      .from('inventory_reservations')
+      .delete()
+      .eq('reservation_group_id', reservationId);
+    
+    if (cleanupError) {
+      console.error('Error cleaning up reservations:', cleanupError);
+      // Don't throw here as the main payment already succeeded
+    } else {
+      console.log('✅ Cleaned up inventory reservations for:', reservationId);
     }
   }
 
@@ -199,6 +226,23 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 }
 
 async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
-  console.log(`Payment failed for payment intent ${paymentIntent.id}`);
+  console.log(`❌ Payment failed for payment intent ${paymentIntent.id}`);
+  
+  const { reservationId } = paymentIntent.metadata as any;
+  
+  // Clean up inventory reservations on payment failure
+  if (reservationId) {
+    const { error: cleanupError } = await supabase
+      .from('inventory_reservations')
+      .delete()
+      .eq('reservation_group_id', reservationId);
+    
+    if (cleanupError) {
+      console.error('Error cleaning up failed payment reservations:', cleanupError);
+    } else {
+      console.log('✅ Cleaned up reservations for failed payment:', reservationId);
+    }
+  }
+  
   // You can add additional logic here like sending failure notifications
 } 

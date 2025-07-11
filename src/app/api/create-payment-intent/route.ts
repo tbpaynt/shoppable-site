@@ -45,6 +45,72 @@ async function getOrCreateStripeCustomer(userEmail: string, userName?: string) {
   return customer.id;
 }
 
+// Clean up expired reservations (older than 15 minutes)
+async function cleanupExpiredReservations(supabase: any) {
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+  
+  await supabase
+    .from('inventory_reservations')
+    .delete()
+    .lt('created_at', fifteenMinutesAgo.toISOString());
+}
+
+// Reserve inventory for checkout
+async function reserveInventory(supabase: any, items: CartItemInRequest[], userEmail: string, reservationId: string) {
+  // Clean up old reservations first
+  await cleanupExpiredReservations(supabase);
+  
+  // Check current stock and existing reservations
+  for (const item of items) {
+    // Get current stock
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('stock')
+      .eq('id', item.id)
+      .single();
+
+    if (productError || !product) {
+      throw new Error(`Product ${item.id} not found`);
+    }
+
+    // Get current reservations for this product (excluding expired ones)
+    const { data: reservations, error: reservationsError } = await supabase
+      .from('inventory_reservations')
+      .select('quantity')
+      .eq('product_id', item.id)
+      .gte('created_at', new Date(Date.now() - 15 * 60 * 1000).toISOString());
+
+    if (reservationsError) {
+      throw new Error(`Failed to check reservations for product ${item.id}`);
+    }
+
+    const reservedQuantity = reservations?.reduce((sum: number, r: any) => sum + r.quantity, 0) || 0;
+    const availableStock = (product.stock || 0) - reservedQuantity;
+
+    if (item.quantity > availableStock) {
+      throw new Error(`Insufficient stock for "${item.id}". Available: ${availableStock}, Requested: ${item.quantity}`);
+    }
+  }
+
+  // Create reservations for all items
+  const reservationInserts = items.map(item => ({
+    id: uuidv4(),
+    reservation_group_id: reservationId,
+    product_id: item.id,
+    quantity: item.quantity,
+    user_email: userEmail,
+    created_at: new Date().toISOString()
+  }));
+
+  const { error: insertError } = await supabase
+    .from('inventory_reservations')
+    .insert(reservationInserts);
+
+  if (insertError) {
+    throw new Error(`Failed to reserve inventory: ${insertError.message}`);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // ───────────────────────────────────────────────
@@ -81,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     const { data: productsFromDb, error } = await supabase
       .from("products")
-      .select("id, name, price, shipping_cost")
+      .select("id, name, price, shipping_cost, stock")
       .in("id", productIds);
 
     if (error) {
@@ -90,7 +156,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Ensure every requested item exists in DB
-    const productMap = new Map<number, { id: number; name: string; price: number; shipping_cost?: number }>();
+    const productMap = new Map<number, { id: number; name: string; price: number; shipping_cost?: number; stock?: number }>();
     productsFromDb?.forEach((p) => productMap.set(p.id, p as any));
 
     for (const reqItem of items) {
@@ -100,7 +166,21 @@ export async function POST(request: NextRequest) {
     }
 
     // ───────────────────────────────────────────────
-    // 4. Calculate total from verified prices (in cents)
+    // 4. **CRITICAL: Reserve inventory to prevent overselling**
+    // ───────────────────────────────────────────────
+    const reservationId = uuidv4();
+    
+    try {
+      await reserveInventory(supabase, items, session.user.email, reservationId);
+    } catch (reservationError) {
+      console.error("Inventory reservation failed:", reservationError);
+      return NextResponse.json({ 
+        error: (reservationError as Error).message 
+      }, { status: 409 }); // 409 Conflict for stock issues
+    }
+
+    // ───────────────────────────────────────────────
+    // 5. Calculate total from verified prices (in cents)
     // ───────────────────────────────────────────────
     const amountInCents = items.reduce((sum, item) => {
       const product = productMap.get(item.id)!;
@@ -121,16 +201,15 @@ export async function POST(request: NextRequest) {
     }
 
     // ───────────────────────────────────────────────
-    // 5. Get or create Stripe customer ID
+    // 6. Get or create Stripe customer ID
     // ───────────────────────────────────────────────
     const customerId = await getOrCreateStripeCustomer(
       session.user.email,
       session.user.name || undefined
     );
 
-
     // ───────────────────────────────────────────────
-    // 6. Create PaymentIntent with customer ID
+    // 7. Create PaymentIntent with customer ID and reservation info
     // ───────────────────────────────────────────────
     const stripe = getStripeServer();
 
@@ -143,6 +222,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         orderId,
         userEmail: session.user.email,
+        reservationId, // Include reservation ID for cleanup
         items: JSON.stringify(
           items.map((i) => ({
             id: i.id,
@@ -161,7 +241,7 @@ export async function POST(request: NextRequest) {
     });
 
     // ───────────────────────────────────────────────
-    // 7. Create CustomerSession to enable saved payment methods
+    // 8. Create CustomerSession to enable saved payment methods
     // ───────────────────────────────────────────────
     const customerSession = await stripe.customerSessions.create({
       customer: customerId,
@@ -174,11 +254,6 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-
-    // ───────────────────────────────────────────────
-    // 8. TODO: Insert a pending order row if you track orders in Supabase
-    //    await supabase.from('orders').insert({...})
-    // ───────────────────────────────────────────────
 
     return NextResponse.json({ 
       clientSecret: paymentIntent.client_secret, 
