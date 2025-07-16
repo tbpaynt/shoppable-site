@@ -93,8 +93,18 @@ export default function CartPage() {
   }, [cart, address.name, address.street1, address.city, address.state, address.zip]);
 
   const productTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  
+  // Check if order qualifies for free shipping ($100 or more)
+  const qualifiesForFreeShipping = productTotal >= 100;
+  
   // Use dynamic quote if available else per-item shipping cost fallback
-  const shippingTotal = shippingQuote !== null ? shippingQuote : cart.reduce((sum, item) => sum + (item.shipping_cost || 0) * item.quantity, 0);
+  let shippingTotal = shippingQuote !== null ? shippingQuote : cart.reduce((sum, item) => sum + (item.shipping_cost || 0) * item.quantity, 0);
+  
+  // Apply free shipping if order qualifies
+  if (qualifiesForFreeShipping) {
+    shippingTotal = 0;
+  }
+  
   const taxableBase = productTotal + shippingTotal;
   const taxTotal = +(taxableBase * TAX_RATE).toFixed(2);
   const total = productTotal + shippingTotal + taxTotal;
@@ -215,8 +225,15 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between text-sm font-normal">
                 <span>Shipping</span>
-                <span>${shippingTotal.toFixed(2)}</span>
+                <span className={qualifiesForFreeShipping ? "text-green-600" : ""}>
+                  {qualifiesForFreeShipping ? "FREE" : `$${shippingTotal.toFixed(2)}`}
+                </span>
               </div>
+              {qualifiesForFreeShipping && (
+                <div className="text-green-600 text-xs text-center">
+                  🎉 Free shipping applied on orders $100+
+                </div>
+              )}
               <div className="flex justify-between text-sm font-normal">
                 <span>Tax (6%)</span>
                 <span>${taxTotal.toFixed(2)}</span>
@@ -357,7 +374,16 @@ export default function CartPage() {
           </table>
           <div className="flex justify-between items-center mb-6">
             <button className="text-gray-600 underline" onClick={clearCart}>Clear Cart</button>
-            <div className="text-xl font-bold">Total: ${total.toFixed(2)}</div>
+            <div className="text-right">
+              {qualifiesForFreeShipping ? (
+                <div className="text-green-600 font-semibold text-sm mb-1">🎉 FREE SHIPPING APPLIED!</div>
+              ) : (
+                <div className="text-gray-600 text-sm mb-1">
+                  Add ${(100 - productTotal).toFixed(2)} more for FREE SHIPPING
+                </div>
+              )}
+              <div className="text-xl font-bold">Total: ${total.toFixed(2)}</div>
+            </div>
           </div>
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">

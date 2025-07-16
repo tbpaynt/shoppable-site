@@ -41,9 +41,12 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="w-full bg-gray-900 text-white px-8 py-4 flex items-center justify-between mb-8">
+    <nav className="w-full bg-gray-900 text-white px-8 py-4 flex items-center justify-between">
       <div className="flex items-center gap-8">
-        <Link href="/" className="text-2xl font-bold">Shop</Link>
+        {/* Logo/Brand link - now just a home link */}
+        <Link href="/" className="text-xl font-semibold text-gray-300 hover:text-white transition-colors">
+          Home
+        </Link>
       </div>
       <div className="flex items-center gap-6">
         {status === 'authenticated' ? (

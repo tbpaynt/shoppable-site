@@ -46,6 +46,8 @@ export default function ProductListPage({}) {
   const [products, setProducts] = React.useState<Product[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [isHovering, setIsHovering] = useState(false);
 
   React.useEffect(() => {
     (async () => {
@@ -69,6 +71,23 @@ export default function ProductListPage({}) {
     return () => clearInterval(timer);
   }, []);
 
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMousePosition({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const touch = e.touches[0];
+    setMousePosition({
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top
+    });
+  };
+
   const goLiveDate = goLiveTime ? new Date(goLiveTime) : null;
   const isBeforeGoLive = goLiveDate && now < goLiveDate;
   const countdown = goLiveDate ? formatCountdown(goLiveDate.getTime() - now.getTime()) : null;
@@ -77,37 +96,93 @@ export default function ProductListPage({}) {
 
   return (
     <div className="max-w-full min-h-screen" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'}}>
-      {goLiveDate && isBeforeGoLive && (
-        <div className="w-full min-h-screen flex flex-col justify-center items-center" style={{color: 'white'}}>
-          <div className="w-full flex flex-col items-center pt-16">
-            <h2 className="text-4xl sm:text-6xl font-bold tracking-wide mb-8 text-center">SNAG A DEAL IN...</h2>
-            <div className="flex flex-row gap-8 mb-8">
-              <div className="flex flex-col items-center">
-                <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.days).padStart(2, '0')}</span>
-                <span className="text-lg tracking-widest mt-2">DAYS</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.hours).padStart(2, '0')}</span>
-                <span className="text-lg tracking-widest mt-2">HOURS</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.minutes).padStart(2, '0')}</span>
-                <span className="text-lg tracking-widest mt-2">MINUTES</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.seconds).padStart(2, '0')}</span>
-                <span className="text-lg tracking-widest mt-2">SECONDS</span>
+      {goLiveDate && countdown && (isBeforeGoLive || countdown.days > 0 || countdown.hours > 0 || countdown.minutes > 0 || countdown.seconds > 0) && (
+        <div 
+          className="relative w-full min-h-screen flex flex-col justify-center items-center overflow-hidden" 
+          style={{color: 'white'}}
+          onMouseMove={handleMouseMove}
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+          onTouchMove={handleTouchMove}
+          onTouchStart={() => setIsHovering(true)}
+          onTouchEnd={() => setIsHovering(false)}
+        >
+          {/* Background Products Preview - Only visible through spotlight */}
+          <div className="absolute inset-0">
+            <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
+              <h1 className="text-4xl font-extrabold mb-2 text-center">SNAG YOUR DEALS!</h1>
+              <div className="text-xl mb-8 text-center italic">or someone else will 😎</div>
+              
+              {/* Product Grid Preview */}
+              <div className="max-w-7xl w-full px-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {publishedProducts.slice(0, 10).map(product => (
+                  <div key={product.id} className="block bg-gray-800 rounded shadow p-3 text-white border border-gray-700">
+                    {isValidImageUrl(product.image) ? (
+                      <div className="bg-gray-700 rounded mb-3 overflow-hidden">
+                        <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="bg-gray-700 rounded mb-3 h-32 w-full flex items-center justify-center">
+                        <span className="text-gray-400 text-sm">No Image</span>
+                      </div>
+                    )}
+                    <div className="text-sm font-medium truncate text-white mb-1">{product.name}</div>
+                    <div className="text-xs text-green-400 font-bold">${product.price}</div>
+                  </div>
+                ))}
               </div>
             </div>
-            <h3 className="text-3xl sm:text-4xl font-bold mb-8 text-center">ARE YOU READY?</h3>
-            <div className="text-xl sm:text-2xl tracking-widest font-mono mb-4">KTWHOLESALEFINDS.COM</div>
+          </div>
+          
+          {/* Dynamic Spotlight Overlay */}
+          <div 
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: isHovering 
+                ? `radial-gradient(circle 150px at ${mousePosition.x}px ${mousePosition.y}px, transparent 0%, rgba(0,0,0,1) 100%)`
+                : 'rgba(0,0,0,1)',
+              transition: 'background 0.1s ease-out'
+            }}
+          />
+          
+          {/* Countdown Content */}
+          <div className="relative z-10 w-full flex flex-col items-center pt-16">
+            <div className="w-full flex flex-col items-center pt-16">
+              <h2 className="text-4xl sm:text-6xl font-bold tracking-wide mb-8 text-center">SNAG A DEAL IN...</h2>
+              <div className="flex flex-row gap-8 mb-8">
+                <div className="flex flex-col items-center">
+                  <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.days).padStart(2, '0')}</span>
+                  <span className="text-lg tracking-widest mt-2">DAYS</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.hours).padStart(2, '0')}</span>
+                  <span className="text-lg tracking-widest mt-2">HOURS</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.minutes).padStart(2, '0')}</span>
+                  <span className="text-lg tracking-widest mt-2">MINUTES</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.seconds).padStart(2, '0')}</span>
+                  <span className="text-lg tracking-widest mt-2">SECONDS</span>
+                </div>
+              </div>
+              <h3 className="text-3xl sm:text-4xl font-bold mb-8 text-center">ARE YOU READY?</h3>
+              <div className="text-xl sm:text-2xl tracking-widest font-mono mb-4">KTWHOLESALEFINDS.COM</div>
+              
+              {/* Interactive Hint */}
+              <div className="mt-8 text-center">
+                <p className="text-lg mb-2 opacity-80">👆 Move your cursor or finger to peek at the deals!</p>
+                <div className="w-16 h-1 bg-gradient-to-r from-transparent via-white to-transparent mx-auto animate-pulse"></div>
+              </div>
+            </div>
           </div>
         </div>
       )}
       {!isBeforeGoLive && (
         <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
-          <h1 className="text-4xl font-extrabold mb-2 text-center">WE ARE LIVE</h1>
-          <div className="text-xl mb-8 text-center italic">Don&apos;t let a good deal get by!!!</div>
+          <h1 className="text-4xl font-extrabold mb-2 text-center">SNAG YOUR DEALS!</h1>
+                      <div className="text-xl mb-8 text-center italic">or someone else will 😎</div>
           <div className="max-w-7xl w-full px-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {publishedProducts.map(product => (
               <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-3 text-gray-900">

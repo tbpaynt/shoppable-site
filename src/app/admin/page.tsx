@@ -72,7 +72,7 @@ export default function AdminPage() {
   const [goLiveLoading, setGoLiveLoading] = useState(false);
 
   // Admin panel view management
-  type AdminView = 'products' | 'orders' | 'bulk-import';
+  type AdminView = 'products' | 'orders' | 'bulk-import' | 'customers' | 'reviews';
   const [view, setView] = useState<AdminView>('products');
 
   // Orders state
@@ -86,6 +86,37 @@ export default function AdminPage() {
   };
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+
+  // Customers state
+  type Customer = {
+    id: string;
+    email: string;
+    created_at: string;
+    updated_at: string;
+  };
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+
+  // Reviews state
+  type Review = {
+    id: string;
+    product_id: number;
+    user_id: string;
+    rating: number;
+    title?: string;
+    comment?: string;
+    created_at: string;
+    is_verified_purchase: boolean;
+    is_approved: boolean;
+    products: {
+      name: string;
+    };
+    users: {
+      email: string;
+    };
+  };
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Login form state for admin authentication
   const [email, setEmail] = useState('');
@@ -193,6 +224,43 @@ export default function AdminPage() {
       }
     };
     fetchOrders();
+  }, [view]);
+
+  // Fetch customers whenever view switches to 'customers'
+  useEffect(() => {
+    if (view !== 'customers') return;
+    const fetchCustomers = async () => {
+      setCustomersLoading(true);
+      try {
+        const res = await fetch('/api/customers');
+        const data = await res.json();
+        console.log('Customers API response:', data); // Debug log
+        setCustomers(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error('Error fetching customers', e);
+      } finally {
+        setCustomersLoading(false);
+      }
+    };
+    fetchCustomers();
+  }, [view]);
+
+  // Fetch reviews whenever view switches to 'reviews'
+  useEffect(() => {
+    if (view !== 'reviews') return;
+    const fetchReviews = async () => {
+      setReviewsLoading(true);
+      try {
+        const res = await fetch('/api/admin/reviews');
+        const data = await res.json();
+        setReviews(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error('Error fetching reviews', e);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+    fetchReviews();
   }, [view]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -637,6 +705,8 @@ export default function AdminPage() {
           >
             <option value="products">Products</option>
             <option value="orders">Orders</option>
+            <option value="customers">Customers</option>
+            <option value="bulk-import">Bulk Import</option>
           </select>
         </div>
 
@@ -674,6 +744,61 @@ export default function AdminPage() {
     );
   }
 
+  // Render CUSTOMERS view
+  if (view === 'customers') {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <h1 className="text-3xl font-bold mb-6">Admin Dashboard – Customers</h1>
+        <div className="mb-6">
+          <label className="mr-2 font-semibold">Select view:</label>
+          <select
+            value={view}
+            onChange={(e) => setView(e.target.value as AdminView)}
+            className="p-2 rounded text-black"
+          >
+            <option value="products">Products</option>
+            <option value="orders">Orders</option>
+            <option value="customers">Customers</option>
+            <option value="bulk-import">Bulk Import</option>
+          </select>
+        </div>
+
+        {customersLoading ? (
+          <div>Loading customers...</div>
+        ) : (
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h2 className="text-xl font-bold mb-4">Customer List ({customers.length} total)</h2>
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="text-left p-2">ID</th>
+                  <th className="text-left p-2">Email</th>
+                  <th className="text-left p-2">Created</th>
+                  <th className="text-left p-2">Last Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.map((customer) => (
+                  <tr key={customer.id} className="border-t border-gray-700">
+                    <td className="p-2 font-mono text-sm">{customer.id}</td>
+                    <td className="p-2">{customer.email}</td>
+                    <td className="p-2">{new Date(customer.created_at).toLocaleString()}</td>
+                    <td className="p-2">{new Date(customer.updated_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {customers.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                No customers found
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Render BULK IMPORT view
   if (view === 'bulk-import') {
     return (
@@ -688,6 +813,7 @@ export default function AdminPage() {
           >
             <option value="products">Products</option>
             <option value="orders">Orders</option>
+            <option value="customers">Customers</option>
             <option value="bulk-import">Bulk Import</option>
           </select>
         </div>
@@ -1002,6 +1128,7 @@ export default function AdminPage() {
         >
           <option value="products">Products</option>
           <option value="orders">Orders</option>
+          <option value="customers">Customers</option>
           <option value="bulk-import">Bulk Import</option>
         </select>
       </div>
