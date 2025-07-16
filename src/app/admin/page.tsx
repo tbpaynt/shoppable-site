@@ -98,23 +98,7 @@ export default function AdminPage() {
   const [customersLoading, setCustomersLoading] = useState(false);
 
   // Reviews state
-  type Review = {
-    id: string;
-    product_id: number;
-    user_id: string;
-    rating: number;
-    title?: string;
-    comment?: string;
-    created_at: string;
-    is_verified_purchase: boolean;
-    is_approved: boolean;
-    products: {
-      name: string;
-    };
-    users: {
-      email: string;
-    };
-  };
+
 
 
   // Login form state for admin authentication
