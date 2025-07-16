@@ -8,7 +8,7 @@ export default function TermsPage() {
           <div>
             <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
             <p className="text-gray-300 mb-4">
-              By accessing and using KT Wholesale Finds ("we," "us," or "our"), you accept and agree to be bound by the terms and provision of this agreement.
+              By accessing and using KT Wholesale Finds (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), you accept and agree to be bound by the terms and provision of this agreement.
             </p>
             <p className="text-gray-300">
               If you do not agree to abide by the above, please do not use this service.
@@ -18,7 +18,7 @@ export default function TermsPage() {
           <div>
             <h2 className="text-2xl font-semibold mb-4">2. Use License</h2>
             <p className="text-gray-300 mb-4">
-              Permission is granted to temporarily download one copy of the materials (information or software) on KT Wholesale Finds's website for personal, non-commercial transitory viewing only.
+              Permission is granted to temporarily download one copy of the materials (information or software) on KT Wholesale Finds&apos;s website for personal, non-commercial transitory viewing only.
             </p>
             <p className="text-gray-300 mb-4">This is the grant of a license, not a transfer of title, and under this license you may not:</p>
             <ul className="text-gray-300 space-y-2 ml-6">
@@ -62,7 +62,7 @@ export default function TermsPage() {
           <div>
             <h2 className="text-2xl font-semibold mb-4">6. Returns and Refunds</h2>
             <p className="text-gray-300 mb-4">
-              All sales are final. Please refer to our Return Policy for detailed information about our "All Sales Final" policy.
+              All sales are final. Please refer to our Return Policy for detailed information about our &quot;All Sales Final&quot; policy.
             </p>
             <p className="text-gray-300">
               No returns, refunds, or exchanges are accepted unless otherwise specified in our Return Policy.

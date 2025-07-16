@@ -28,7 +28,7 @@ export default function ShippingPage() {
           <div className="bg-gray-800 p-6 rounded-lg">
             <h2 className="text-2xl font-semibold mb-4">Tracking Information</h2>
             <p className="text-gray-300 mb-2">
-              Once your order ships, you'll receive a confirmation email with tracking information. You can also track your order through your account dashboard.
+              Once your order ships, you&apos;ll receive a confirmation email with tracking information. You can also track your order through your account dashboard.
             </p>
             <p className="text-gray-300">
               Tracking numbers are typically available within 24 hours of shipment.

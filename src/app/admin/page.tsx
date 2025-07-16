@@ -115,8 +115,7 @@ export default function AdminPage() {
       email: string;
     };
   };
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
+
 
   // Login form state for admin authentication
   const [email, setEmail] = useState('');
@@ -245,23 +244,7 @@ export default function AdminPage() {
     fetchCustomers();
   }, [view]);
 
-  // Fetch reviews whenever view switches to 'reviews'
-  useEffect(() => {
-    if (view !== 'reviews') return;
-    const fetchReviews = async () => {
-      setReviewsLoading(true);
-      try {
-        const res = await fetch('/api/admin/reviews');
-        const data = await res.json();
-        setReviews(Array.isArray(data) ? data : []);
-      } catch (e) {
-        console.error('Error fetching reviews', e);
-      } finally {
-        setReviewsLoading(false);
-      }
-    };
-    fetchReviews();
-  }, [view]);
+
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {

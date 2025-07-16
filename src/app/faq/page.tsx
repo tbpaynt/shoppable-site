@@ -69,7 +69,7 @@ export default function FAQPage() {
         
         <div className="bg-gray-800 rounded-lg p-8">
           <p className="text-gray-300 mb-8 text-center">
-            Can't find what you're looking for? <a href="/contact" className="text-blue-400 hover:text-blue-300 underline">Contact us</a> and we'll be happy to help!
+            Can&apos;t find what you&apos;re looking for? <a href="/contact" className="text-blue-400 hover:text-blue-300 underline">Contact us</a> and we&apos;ll be happy to help!
           </p>
           
           <div className="space-y-4">

@@ -59,7 +59,7 @@ export default function ReturnsPage() {
         <div className="bg-gray-800 rounded-lg p-8">
           <h3 className="text-2xl font-semibold mb-6 text-green-300">Questions?</h3>
           <p className="text-gray-300 mb-6 text-center">
-            If you have any questions about our policy, please don't hesitate to contact us before making your purchase.
+            If you have any questions about our policy, please don&apos;t hesitate to contact us before making your purchase.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a 

@@ -19,7 +19,7 @@ export default function AboutPage() {
           <div className="bg-blue-900 p-6 rounded-lg mt-6">
             <h3 className="text-xl font-bold text-blue-200 mb-2 text-center">Our Promise</h3>
             <p className="text-blue-100 text-center text-lg font-semibold">
-              "We hunt for the deals, so that our customers can get the steals!"
+              &quot;We hunt for the deals, so that our customers can get the steals!&quot;
             </p>
           </div>
         </div>
