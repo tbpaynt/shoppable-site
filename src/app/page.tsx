@@ -212,6 +212,20 @@ export default function HomePage() {
   return (
     <div className="max-w-full min-h-screen" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'}}>
       <FreeShippingBanner />
+      
+      {/* $10 Only Banner */}
+      <div className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 py-4 px-4 shadow-lg border-b border-blue-400">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-center">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl sm:text-3xl font-bold text-white">🔥</span>
+            <span className="text-xl sm:text-2xl font-bold text-white">EVERYTHING</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-3xl sm:text-4xl font-black text-yellow-300 drop-shadow-lg">ONLY $10!</span>
+            <span className="text-2xl sm:text-3xl font-bold text-white">🔥</span>
+          </div>
+        </div>
+      </div>
 
       {goLiveDate && countdown && (isBeforeGoLive || countdown.days > 0 || countdown.hours > 0 || countdown.minutes > 0 || countdown.seconds > 0) && (
         <div 
@@ -227,8 +241,7 @@ export default function HomePage() {
           {/* Background Products Preview - Only visible through spotlight */}
           <div className="absolute inset-0">
             <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
-              <h1 className="text-4xl font-extrabold mb-2 text-center">SNAG YOUR DEALS!</h1>
-              <div className="text-xl mb-8 text-center italic">or someone else will 😎</div>
+              <h1 className="text-4xl font-extrabold mb-8 text-center">SNAG YOUR DEALS!</h1>
               
               {/* Product Grid Preview */}
               <div className="max-w-7xl w-full px-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -298,10 +311,7 @@ export default function HomePage() {
       )}
       {!isBeforeGoLive && (
         <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
-          <h1 className="text-4xl font-extrabold mb-2 text-center">SNAG YOUR DEALS!</h1>
-                      <div className="text-xl mb-8 text-center italic">or someone else will 😎</div>
-          
-
+          <h1 className="text-4xl font-extrabold mb-8 text-center">SNAG YOUR DEALS!</h1>
           
           {/* Search and Filter Section */}
           <div className="max-w-7xl w-full px-4 mb-4">
