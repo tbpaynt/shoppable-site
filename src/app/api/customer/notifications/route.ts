@@ -16,16 +16,28 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch notification preferences for user's orders
+    // First get the user's order IDs
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('user_email', session.user.email);
+
+    if (ordersError) {
+      console.error('Error fetching user orders:', ordersError);
+      return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
+    }
+
+    if (!orders || orders.length === 0) {
+      return NextResponse.json({});
+    }
+
+    const orderIds = orders.map(order => order.id);
+
+    // Then fetch notification preferences for those orders
     const { data: prefs, error } = await supabase
       .from('notification_preferences')
       .select('order_id, email_notifications')
-      .in('order_id', 
-        supabase
-          .from('orders')
-          .select('id')
-          .eq('user_email', session.user.email)
-      );
+      .in('order_id', orderIds);
 
     if (error) {
       console.error('Error fetching notification preferences:', error);
