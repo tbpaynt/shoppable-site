@@ -67,25 +67,18 @@ function PurchaseHistory({ userEmail }: { userEmail: string }) {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, created_at, total_amount, ship_cost, tax_amount, status, tracking_number, label_url, order_items(id, name, price, quantity)')
-          .eq('user_email', userEmail)
-          .order('created_at', { ascending: false });
+        // Fetch orders through secure API endpoint
+        const ordersResponse = await fetch('/api/customer/orders');
+        if (!ordersResponse.ok) {
+          throw new Error('Failed to fetch orders');
+        }
+        const ordersData = await ordersResponse.json();
+        setOrders(ordersData || []);
 
-        if (error) throw error;
-        setOrders(data || []);
-
-        // Fetch notification preferences
-        const { data: prefs } = await supabase
-          .from('notification_preferences')
-          .select('order_id, email_notifications');
-
-        if (prefs) {
-          const prefsMap = prefs.reduce((acc: Record<string, boolean>, pref: { order_id: string, email_notifications: boolean }) => {
-            acc[pref.order_id] = pref.email_notifications;
-            return acc;
-          }, {});
+        // Fetch notification preferences through secure API endpoint
+        const notificationsResponse = await fetch('/api/customer/notifications');
+        if (notificationsResponse.ok) {
+          const prefsMap = await notificationsResponse.json();
           setNotificationPreferences(prefsMap);
         }
       } catch (error) {
