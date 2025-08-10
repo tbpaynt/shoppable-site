@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '../../../utils/supabaseClient';
 import type { Product } from '../../products';
 import Image from 'next/image';
+import ViewerCountBadge from '@/components/ViewerCountBadge';
+import { useProductViews } from '@/hooks/useProductViews';
 
 // Helper function to validate image URLs
 function isValidImageUrl(url: string | null | undefined): boolean {
@@ -34,6 +36,7 @@ export default function ProductDetailPage() {
   const id = params && typeof params.id === 'string' ? params.id : '';
   const { addToCart } = useCart();
   const router = useRouter();
+  const { trackView } = useProductViews();
   const [product, setProduct] = useState<Product | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [images, setImages] = useState<{ image_url: string }[]>([]);
@@ -55,6 +58,10 @@ export default function ProductDetailPage() {
         return;
       }
       setProduct(prod);
+      
+      // Track product view
+      trackView(prod.id);
+      
       if (prod.category_id) {
         const { data: category } = await supabase
           .from('categories')
@@ -109,6 +116,9 @@ export default function ProductDetailPage() {
       <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
       <div className="mb-2 text-gray-300">Listing #: {product.listing_number}</div>
       <div className="mb-2 text-gray-300">Category: {categoryName}</div>
+      <div className="mb-4">
+        <ViewerCountBadge productId={product.id} className="mb-2" />
+      </div>
       <div className="mb-4 flex gap-4">
         {isValidImageUrl(product.image) ? (
           <Image src={product.image} alt={product.name} width={256} height={256} className="h-64 w-64 object-cover rounded border" />

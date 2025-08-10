@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from "react";
 import type { Product } from '../products';
 import Image from 'next/image';
+import ViewerCountBadge from '@/components/ViewerCountBadge';
+import { useProductViews } from '@/hooks/useProductViews';
 
 // Helper function to validate image URLs
 function isValidImageUrl(url: string | null | undefined): boolean {
@@ -42,6 +44,7 @@ function formatCountdown(diffMs: number) {
 
 export default function ProductListPage({}) {
   const { addToCart } = useCart();
+  const { trackView } = useProductViews();
   const router = useRouter();
   const [products, setProducts] = React.useState<Product[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
@@ -186,12 +189,20 @@ export default function ProductListPage({}) {
           <div className="max-w-7xl w-full px-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {publishedProducts.map(product => (
               <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-3 text-gray-900">
-                <Link href={`/products/${product.id}`}>
+                <Link href={`/products/${product.id}`} onClick={() => trackView(product.id)}>
                   {isValidImageUrl(product.image) ? (
-                    <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
+                    <div className="relative">
+                      <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
+                      <div className="absolute top-2 left-2">
+                        <ViewerCountBadge productId={product.id} />
+                      </div>
+                    </div>
                   ) : (
-                    <div className="h-32 w-full bg-gray-200 rounded mb-3 flex items-center justify-center">
+                    <div className="h-32 w-full bg-gray-200 rounded mb-3 flex items-center justify-center relative">
                       <span className="text-gray-500 text-sm">No Image</span>
+                      <div className="absolute top-2 left-2">
+                        <ViewerCountBadge productId={product.id} />
+                      </div>
                     </div>
                   )}
                   <div className="font-semibold text-base mb-1">{product.name}</div>

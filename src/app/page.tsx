@@ -7,6 +7,8 @@ import type { Product } from './products';
 import Image from 'next/image';
 import { supabase } from '../utils/supabaseClient';
 import FreeShippingBanner from './components/FreeShippingBanner';
+import ViewerCountBadge from '@/components/ViewerCountBadge';
+import { useProductViews } from '@/hooks/useProductViews';
 
 // Helper function to validate image URLs
 function isValidImageUrl(url: string | null | undefined): boolean {
@@ -44,6 +46,7 @@ function formatCountdown(diffMs: number) {
 
 export default function HomePage() {
   const { addToCart } = useCart();
+  const { trackView } = useProductViews();
   const router = useRouter();
   const [products, setProducts] = React.useState<Product[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
@@ -498,14 +501,20 @@ export default function HomePage() {
           <div className="max-w-7xl w-full px-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {filteredAndSortedProducts.map(product => (
               <div key={product.id} className="block bg-gray-800 rounded shadow hover:shadow-lg transition p-3 text-white border border-gray-700">
-                <Link href={`/products/${product.id}`}>
+                <Link href={`/products/${product.id}`} onClick={() => trackView(product.id)}>
                   {isValidImageUrl(product.image) ? (
-                    <div className="bg-gray-700 rounded mb-3 overflow-hidden">
+                    <div className="bg-gray-700 rounded mb-3 overflow-hidden relative">
                       <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover" />
+                      <div className="absolute top-2 left-2">
+                        <ViewerCountBadge productId={product.id} />
+                      </div>
                     </div>
                   ) : (
-                    <div className="h-32 w-full bg-gray-700 rounded mb-3 flex items-center justify-center">
+                    <div className="h-32 w-full bg-gray-700 rounded mb-3 flex items-center justify-center relative">
                       <span className="text-gray-400 text-sm">No Image</span>
+                      <div className="absolute top-2 left-2">
+                        <ViewerCountBadge productId={product.id} />
+                      </div>
                     </div>
                   )}
                   <div className="font-semibold text-base mb-1 text-white">{product.name}</div>
