@@ -77,7 +77,7 @@ export default function ProductDetailPage() {
       setImages(imgs || []);
       setLoading(false);
     })();
-  }, [id]);
+  }, [id, trackView]);
 
   const handleAddToCart = async () => {
     if (!product) return;

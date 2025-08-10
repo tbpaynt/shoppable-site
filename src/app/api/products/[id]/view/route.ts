@@ -8,10 +8,11 @@ const supabase = createClient(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = parseInt(params.id);
+    const resolvedParams = await params;
+    const productId = parseInt(resolvedParams.id);
     if (isNaN(productId)) {
       return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
     }
