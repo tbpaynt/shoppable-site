@@ -1,8 +1,17 @@
 'use client';
 import { useSession, signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import type { Product } from "../products";
 import { supabase } from "../../utils/supabaseClient";
+import { createClient } from '@supabase/supabase-js';
+
+// Create service role client for admin operations (fallback to regular client if service key not available)
+const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY 
+  ? createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  : supabase;
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -69,10 +78,22 @@ export default function AdminPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string>("");
+  const [countdownMessage, setCountdownMessage] = useState<string>("");
   const [goLiveLoading, setGoLiveLoading] = useState(false);
 
+  // Bulk price update state
+  const [bulkPriceUpdateType, setBulkPriceUpdateType] = useState<'percentage' | 'fixed' | 'set'>('percentage');
+  const [bulkPriceValue, setBulkPriceValue] = useState<string>("");
+  const [bulkPriceLoading, setBulkPriceLoading] = useState(false);
+
+  // Category management state
+  const [newCategory, setNewCategory] = useState({ name: '' });
+  const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [categoryLoading, setCategoryLoading] = useState(false);
+
   // Admin panel view management
-  type AdminView = 'products' | 'orders' | 'bulk-import' | 'customers' | 'reviews';
+  type AdminView = 'products' | 'orders' | 'bulk-import' | 'customers' | 'reviews' | 'categories';
   const [view, setView] = useState<AdminView>('products');
 
   // Orders state
@@ -86,6 +107,7 @@ export default function AdminPage() {
   };
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   // Customers state
   type Customer = {
@@ -179,13 +201,14 @@ export default function AdminPage() {
     fetchProducts();
   }, []);
 
-  // Fetch go-live time on mount
+  // Fetch go-live time and countdown message on mount
   useEffect(() => {
     const fetchGoLive = async () => {
       setGoLiveLoading(true);
       const res = await fetch("/api/settings/go-live");
       const data = await res.json();
       if (data.goLiveTime) setGoLiveTime(data.goLiveTime);
+      if (data.countdownMessage) setCountdownMessage(data.countdownMessage);
       setGoLiveLoading(false);
     };
     fetchGoLive();
@@ -208,6 +231,202 @@ export default function AdminPage() {
     };
     fetchOrders();
   }, [view]);
+
+  // Update order status function
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        // Update the order in the local state
+        setOrders(orders.map(order => order.id === orderId ? { ...order, status: updated.status } : order));
+      } else {
+        console.error('Failed to update order status');
+        alert('Failed to update order status');
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      alert('Error updating order status');
+    }
+  };
+
+  // Print picking list function
+  const handlePrintPickingList = (order: OrderSummary) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Picking List - Order ${order.id}</title>
+          <style>
+            @media print {
+              @page {
+                margin: 0.5in;
+              }
+              body {
+                margin: 0;
+                padding: 0;
+              }
+            }
+            body {
+              font-family: Arial, sans-serif;
+              padding: 15px;
+              color: #000;
+              background: #fff;
+              font-size: 11px;
+            }
+            .header {
+              border-bottom: 3px solid #000;
+              padding-bottom: 10px;
+              margin-bottom: 12px;
+            }
+            .header h1 {
+              margin: 0 0 8px 0;
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .order-info {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 10px;
+              margin-bottom: 12px;
+              font-size: 10px;
+            }
+            .info-item {
+              display: flex;
+              flex-direction: column;
+            }
+            .info-label {
+              font-weight: bold;
+              margin-bottom: 2px;
+            }
+            .items-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 12px;
+              font-size: 10px;
+            }
+            .items-table th {
+              background-color: #f0f0f0;
+              border: 1px solid #000;
+              padding: 5px 8px;
+              text-align: left;
+              font-weight: bold;
+              font-size: 10px;
+            }
+            .items-table td {
+              border: 1px solid #000;
+              padding: 5px 8px;
+              font-size: 10px;
+            }
+            .items-table tr:nth-child(even) {
+              background-color: #f9f9f9;
+            }
+            .quantity {
+              text-align: center;
+              font-weight: bold;
+              font-size: 11px;
+            }
+            .footer {
+              margin-top: 15px;
+              padding-top: 10px;
+              border-top: 2px solid #000;
+              display: flex;
+              justify-content: space-between;
+              font-weight: bold;
+              font-size: 10px;
+            }
+            .checkboxes {
+              margin-top: 12px;
+              font-size: 10px;
+            }
+            .checkbox-item {
+              margin: 3px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>📦 PICKING LIST</h1>
+            <div class="order-info">
+              <div class="info-item">
+                <span class="info-label">Order ID:</span>
+                <span>${order.id}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Order Date:</span>
+                <span>${new Date(order.created_at).toLocaleString()}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Customer:</span>
+                <span>${order.user_email || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Status:</span>
+                <span>${order.status.toUpperCase()}</span>
+              </div>
+            </div>
+          </div>
+
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th style="width: 10%;">#</th>
+                <th style="width: 50%;">Item Name</th>
+                <th style="width: 15%;">Quantity</th>
+                <th style="width: 25%;">✓ Picked</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.order_items.map((item, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td><strong>${item.name}</strong></td>
+                  <td class="quantity">${item.quantity}</td>
+                  <td style="text-align: center;">☐</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <div>
+              <div>Total Items: <strong>${order.order_items.reduce((sum, item) => sum + item.quantity, 0)}</strong></div>
+              <div>Unique Products: <strong>${order.order_items.length}</strong></div>
+            </div>
+            <div>
+              <div>Order Total: <strong>$${order.total_amount.toFixed(2)}</strong></div>
+            </div>
+          </div>
+
+          <div class="checkboxes">
+            <div class="checkbox-item">☐ Items picked</div>
+            <div class="checkbox-item">☐ Items packed</div>
+            <div class="checkbox-item">☐ Ready to ship</div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() {
+                window.close();
+              };
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+  };
 
   // Fetch customers whenever view switches to 'customers'
   useEffect(() => {
@@ -243,21 +462,27 @@ export default function AdminPage() {
     let imageUrl = newProduct.image;
     const additionalImageUrls: string[] = [];
     // Upload all images if files are selected
+    console.log('🔍 DEBUG: Starting product creation with', imageFiles.length, 'image files');
     if (imageFiles.length > 0) {
       for (let i = 0; i < imageFiles.length; i++) {
         const file = imageFiles[i];
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}_${i}.${fileExt}`;
-        const { error } = await supabase
+        console.log('🔍 DEBUG: Uploading image', i + 1, ':', fileName);
+        
+        const { error } = await supabaseAdmin
           .storage
           .from('product-images')
           .upload(fileName, file);
         if (error) {
+          console.error('❌ Error uploading image:', error);
           alert('Image upload failed: ' + error.message);
           setLoading(false);
           return;
         }
         const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${fileName}`;
+        console.log('✅ Image uploaded successfully:', url);
+        
         if (i === 0) imageUrl = url;
         else additionalImageUrls.push(url);
       }
@@ -270,9 +495,28 @@ export default function AdminPage() {
     });
     if (res.ok) {
       const created = await res.json();
-      // Save additional images to product_images table
+      console.log('✅ Product created with ID:', created.id);
+      
+      // Save additional images to product_images table using API route
+      console.log('🔍 DEBUG: Saving', additionalImageUrls.length, 'additional images to database');
       for (const url of additionalImageUrls) {
-        await supabase.from('product_images').insert({ product_id: created.id, image_url: url });
+        console.log('🔍 DEBUG: Inserting image URL:', url);
+        try {
+          const response = await fetch('/api/product-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ product_id: created.id, image_url: url })
+          });
+          
+          if (response.ok) {
+            console.log('✅ Additional image saved successfully');
+          } else {
+            const error = await response.text();
+            console.error('❌ Error saving additional image:', error);
+          }
+        } catch (error) {
+          console.error('❌ Error saving additional image:', error);
+        }
       }
       setProductList([...productList, created]);
       setNewProduct({ listing_number: "", name: "", image: "", price: 0, retail: 0, countdown: new Date(Date.now() + 1000 * 60 * 60), stock: 0, weight_oz: 0, description: "", shipping_cost: 0, published: false, category_id: undefined });
@@ -311,6 +555,70 @@ export default function AdminPage() {
     setLoading(false);
   };
 
+  // Bulk price update function
+  const handleBulkPriceUpdate = async () => {
+    if (!bulkPriceValue || productList.length === 0) {
+      alert('Please enter a value and ensure there are products to update');
+      return;
+    }
+
+    const value = parseFloat(bulkPriceValue);
+    if (isNaN(value)) {
+      alert('Please enter a valid number');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to update prices for ALL ${productList.length} products?`)) {
+      return;
+    }
+
+    setBulkPriceLoading(true);
+    const updates: Promise<any>[] = [];
+
+    for (const product of productList) {
+      let newPrice = product.price;
+
+      if (bulkPriceUpdateType === 'percentage') {
+        // Percentage change: e.g., +10% or -20%
+        newPrice = product.price * (1 + value / 100);
+      } else if (bulkPriceUpdateType === 'fixed') {
+        // Fixed dollar amount change: e.g., +$5 or -$2
+        newPrice = product.price + value;
+      } else if (bulkPriceUpdateType === 'set') {
+        // Set to fixed price
+        newPrice = value;
+      }
+
+      // Ensure price doesn't go below 0
+      newPrice = Math.max(0, newPrice);
+
+      updates.push(
+        fetch(`/api/products/${product.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ price: newPrice }),
+        }).then(res => res.json())
+      );
+    }
+
+    try {
+      const results = await Promise.all(updates);
+      // Refresh product list
+      const res = await fetch("/api/products");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setProductList(data);
+      }
+      setBulkPriceValue("");
+      alert(`Successfully updated prices for ${productList.length} products!`);
+    } catch (error) {
+      console.error('Error updating prices:', error);
+      alert('Error updating prices. Please try again.');
+    } finally {
+      setBulkPriceLoading(false);
+    }
+  };
+
   const getCategoryName = (id: number) => categories.find(c => c.id === id)?.name || "";
 
   const handleGoLiveSave = async () => {
@@ -318,9 +626,84 @@ export default function AdminPage() {
     await fetch("/api/settings/go-live", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goLiveTime }),
+      body: JSON.stringify({ goLiveTime, countdownMessage }),
     });
     setGoLiveLoading(false);
+  };
+
+  // Category management functions
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategory.name.trim()) return;
+
+    setCategoryLoading(true);
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCategory),
+      });
+
+      if (res.ok) {
+        const created = await res.json();
+        setCategories(prev => [...prev, created]);
+        setNewCategory({ name: '' });
+        setShowCategoryForm(false);
+      } else {
+        const error = await res.text();
+        alert(`Error creating category: ${error}`);
+      }
+    } catch (error) {
+      alert(`Error creating category: ${error}`);
+    }
+    setCategoryLoading(false);
+  };
+
+  const handleEditCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory || !editingCategory.name.trim()) return;
+
+    setCategoryLoading(true);
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingCategory),
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setCategories(prev => prev.map(cat => cat.id === updated.id ? updated : cat));
+        setEditingCategory(null);
+      } else {
+        const error = await res.text();
+        alert(`Error updating category: ${error}`);
+      }
+    } catch (error) {
+      alert(`Error updating category: ${error}`);
+    }
+    setCategoryLoading(false);
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+
+    setCategoryLoading(true);
+    try {
+      const res = await fetch(`/api/categories?id=${id}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setCategories(prev => prev.filter(cat => cat.id !== id));
+      } else {
+        const error = await res.text();
+        alert(`Error deleting category: ${error}`);
+      }
+    } catch (error) {
+      alert(`Error deleting category: ${error}`);
+    }
+    setCategoryLoading(false);
   };
 
   // Bulk import functions
@@ -671,6 +1054,7 @@ export default function AdminPage() {
             className="p-2 rounded text-black"
           >
             <option value="products">Products</option>
+            <option value="categories">Categories</option>
             <option value="orders">Orders</option>
             <option value="customers">Customers</option>
             <option value="bulk-import">Bulk Import</option>
@@ -693,16 +1077,105 @@ export default function AdminPage() {
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id} className="border-t border-gray-700">
-                  <td className="p-2 font-mono">{order.id}</td>
-                  <td className="p-2">{new Date(order.created_at).toLocaleString()}</td>
-                  <td className="p-2">{order.user_email ?? 'N/A'}</td>
-                  <td className="p-2">${order.total_amount.toFixed(2)}</td>
-                  <td className="p-2">{order.status}</td>
-                  <td className="p-2">
-                    {order.order_items.map((it) => `${it.name} x${it.quantity}`).join(', ')}
-                  </td>
-                </tr>
+                <Fragment key={order.id}>
+                  <tr 
+                    className="border-t border-gray-700 hover:bg-gray-800 cursor-pointer transition-colors"
+                    onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                  >
+                    <td className="p-2 font-mono">{order.id}</td>
+                    <td className="p-2">{new Date(order.created_at).toLocaleString()}</td>
+                    <td className="p-2">{order.user_email ?? 'N/A'}</td>
+                    <td className="p-2">${order.total_amount.toFixed(2)}</td>
+                    <td className="p-2">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        order.status === 'completed' 
+                          ? 'bg-green-600 text-white' 
+                          : order.status === 'paid' 
+                          ? 'bg-yellow-600 text-white'
+                          : 'bg-gray-600 text-white'
+                      }`}>
+                        {order.status === 'completed' ? '✓ Complete' : 'Incomplete'}
+                      </span>
+                    </td>
+                    <td className="p-2">
+                      {order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''}
+                      <span className="ml-2 text-gray-400">
+                        {expandedOrder === order.id ? '▼' : '▶'}
+                      </span>
+                    </td>
+                  </tr>
+                  {expandedOrder === order.id && (
+                    <tr key={`${order.id}-details`}>
+                      <td colSpan={6} className="p-4 bg-gray-800 border-t border-gray-700">
+                        <div className="ml-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-lg font-semibold">Order Items</h3>
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newStatus = order.status === 'completed' ? 'paid' : 'completed';
+                                  handleUpdateOrderStatus(order.id, newStatus);
+                                }}
+                                className={`px-4 py-2 rounded flex items-center gap-2 transition-colors ${
+                                  order.status === 'completed'
+                                    ? 'bg-gray-600 hover:bg-gray-700 text-white'
+                                    : 'bg-green-600 hover:bg-green-700 text-white'
+                                }`}
+                                title={order.status === 'completed' ? 'Mark as incomplete' : 'Mark as complete'}
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  {order.status === 'completed' ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  )}
+                                </svg>
+                                {order.status === 'completed' ? 'Mark Incomplete' : 'Mark Complete'}
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePrintPickingList(order);
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                                title="Print picking list"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                                Print Picking List
+                              </button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {order.order_items.map((item) => (
+                              <div 
+                                key={item.id} 
+                                className="flex items-center justify-between py-2 px-4 bg-gray-700 rounded border-l-4 border-blue-500"
+                              >
+                                <div className="flex-1">
+                                  <span className="font-medium">{item.name}</span>
+                                </div>
+                                <div className="flex items-center gap-6 text-gray-300">
+                                  <span>Quantity: <span className="font-semibold text-white">{item.quantity}</span></span>
+                                  <span>Price: <span className="font-semibold text-white">${item.price.toFixed(2)}</span></span>
+                                  <span>Subtotal: <span className="font-semibold text-white">${(item.price * item.quantity).toFixed(2)}</span></span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-4 pt-4 border-t border-gray-600">
+                            <div className="flex justify-end gap-4 text-lg">
+                              <span className="text-gray-400">Order Total:</span>
+                              <span className="font-bold text-white">${order.total_amount.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -724,6 +1197,7 @@ export default function AdminPage() {
             className="p-2 rounded text-black"
           >
             <option value="products">Products</option>
+            <option value="categories">Categories</option>
             <option value="orders">Orders</option>
             <option value="customers">Customers</option>
             <option value="bulk-import">Bulk Import</option>
@@ -779,6 +1253,7 @@ export default function AdminPage() {
             className="p-2 rounded text-black"
           >
             <option value="products">Products</option>
+            <option value="categories">Categories</option>
             <option value="orders">Orders</option>
             <option value="customers">Customers</option>
             <option value="bulk-import">Bulk Import</option>
@@ -1094,6 +1569,7 @@ export default function AdminPage() {
           className="p-2 rounded text-black"
         >
           <option value="products">Products</option>
+          <option value="categories">Categories</option>
           <option value="orders">Orders</option>
           <option value="customers">Customers</option>
           <option value="bulk-import">Bulk Import</option>
@@ -1107,23 +1583,176 @@ export default function AdminPage() {
           {loading && <div className="mb-4">Loading...</div>}
         </>
       )}
-      <div className="mb-8 bg-gray-800 p-4 rounded flex items-center gap-4">
-        <label className="text-lg font-semibold mr-2">Storefront Go Live Time:</label>
-        <input
-          type="datetime-local"
-          className="p-2 rounded text-black"
-          value={utcToLocalInputValue(goLiveTime)}
-          onChange={e => setGoLiveTime(localInputValueToUTC(e.target.value))}
-          disabled={goLiveLoading}
-        />
-        <button
-          className="bg-blue-600 px-4 py-2 rounded text-white"
-          onClick={handleGoLiveSave}
-          disabled={goLiveLoading}
-        >
-          {goLiveLoading ? "Saving..." : "Save"}
-        </button>
+
+      {/* CATEGORY MANAGEMENT */}
+      {view === 'categories' && (
+        <>
+          <h2 className="text-xl mb-4">Category Management</h2>
+          {categoryLoading && <div className="mb-4">Loading...</div>}
+          
+          <div className="mb-6">
+            <button
+              onClick={() => setShowCategoryForm(!showCategoryForm)}
+              className="bg-green-600 px-4 py-2 rounded text-white mb-4"
+            >
+              {showCategoryForm ? 'Cancel' : 'Add New Category'}
+            </button>
+
+            {showCategoryForm && (
+              <form onSubmit={handleAddCategory} className="bg-gray-800 p-4 rounded mb-4">
+                <h3 className="text-lg mb-2">Add New Category</h3>
+                <input
+                  type="text"
+                  placeholder="Category Name"
+                  className="mb-2 p-2 w-full text-black rounded"
+                  value={newCategory.name}
+                  onChange={e => setNewCategory({ name: e.target.value })}
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={categoryLoading}
+                  className="bg-blue-600 px-4 py-2 rounded text-white"
+                >
+                  {categoryLoading ? 'Adding...' : 'Add Category'}
+                </button>
+              </form>
+            )}
+          </div>
+
+          <div className="grid gap-4">
+            {categories.map(category => (
+              <div key={category.id} className="bg-gray-800 p-4 rounded">
+                {editingCategory?.id === category.id ? (
+                  <form onSubmit={handleEditCategory} className="space-y-2">
+                    <input
+                      type="text"
+                      className="p-2 w-full text-black rounded"
+                      value={editingCategory.name}
+                      onChange={e => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                      required
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={categoryLoading}
+                        className="bg-blue-600 px-3 py-1 rounded text-white text-sm"
+                      >
+                        {categoryLoading ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingCategory(null)}
+                        className="bg-gray-600 px-3 py-1 rounded text-white text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-semibold">{category.name}</h3>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingCategory(category)}
+                        className="bg-yellow-600 px-3 py-1 rounded text-white text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(category.id)}
+                        disabled={categoryLoading}
+                        className="bg-red-600 px-3 py-1 rounded text-white text-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="mb-8 bg-gray-800 p-4 rounded space-y-4">
+        <div className="flex items-center gap-4">
+          <label className="text-lg font-semibold mr-2">Storefront Go Live Time:</label>
+          <input
+            type="datetime-local"
+            className="p-2 rounded text-black"
+            value={utcToLocalInputValue(goLiveTime)}
+            onChange={e => setGoLiveTime(localInputValueToUTC(e.target.value))}
+            disabled={goLiveLoading}
+          />
+          <button
+            className="bg-blue-600 px-4 py-2 rounded text-white"
+            onClick={handleGoLiveSave}
+            disabled={goLiveLoading}
+          >
+            {goLiveLoading ? "Saving..." : "Save"}
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-lg font-semibold">Countdown Message (shown during countdown):</label>
+          <textarea
+            className="p-2 rounded text-black w-full min-h-[100px]"
+            value={countdownMessage}
+            onChange={e => setCountdownMessage(e.target.value)}
+            placeholder="Enter a message to display during the countdown..."
+            disabled={goLiveLoading}
+          />
+          <p className="text-sm text-gray-400">This message will be displayed on the countdown page. You can update it anytime.</p>
+        </div>
       </div>
+
+      {/* Bulk Price Update Section */}
+      <div className="mb-8 bg-gray-800 p-4 rounded">
+        <h3 className="text-lg font-semibold mb-4">Bulk Price Update</h3>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium">Update Type:</label>
+            <select
+              className="p-2 rounded text-black"
+              value={bulkPriceUpdateType}
+              onChange={(e) => setBulkPriceUpdateType(e.target.value as 'percentage' | 'fixed' | 'set')}
+              disabled={bulkPriceLoading}
+            >
+              <option value="percentage">Percentage Change (%)</option>
+              <option value="fixed">Fixed Dollar Change ($)</option>
+              <option value="set">Set to Fixed Price ($)</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium">
+              {bulkPriceUpdateType === 'percentage' ? 'Percentage:' : 'Amount ($):'}
+            </label>
+            <input
+              type="number"
+              step={bulkPriceUpdateType === 'percentage' ? '0.01' : '0.01'}
+              className="p-2 rounded text-black w-32"
+              value={bulkPriceValue}
+              onChange={(e) => setBulkPriceValue(e.target.value)}
+              placeholder={bulkPriceUpdateType === 'percentage' ? 'e.g., 10 or -20' : 'e.g., 10.00 or -5.00'}
+              disabled={bulkPriceLoading}
+            />
+          </div>
+          <button
+            className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white disabled:opacity-50"
+            onClick={handleBulkPriceUpdate}
+            disabled={bulkPriceLoading || !bulkPriceValue}
+          >
+            {bulkPriceLoading ? 'Updating...' : `Update All ${productList.length} Products`}
+          </button>
+        </div>
+        <p className="text-sm text-gray-400 mt-3">
+          {bulkPriceUpdateType === 'percentage' && 'Example: Enter 10 to increase all prices by 10%, or -20 to decrease by 20%'}
+          {bulkPriceUpdateType === 'fixed' && 'Example: Enter 5 to add $5 to all prices, or -2 to subtract $2'}
+          {bulkPriceUpdateType === 'set' && 'Example: Enter 19.99 to set all product prices to $19.99'}
+        </p>
+      </div>
+
       <table className="w-full mb-8">
         <thead>
           <tr>

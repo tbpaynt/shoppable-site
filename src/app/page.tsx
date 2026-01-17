@@ -6,7 +6,6 @@ import React, { useEffect, useState } from "react";
 import type { Product } from './products';
 import Image from 'next/image';
 import { supabase } from '../utils/supabaseClient';
-import FreeShippingBanner from './components/FreeShippingBanner';
 import ViewerCountBadge from '@/components/ViewerCountBadge';
 import { useProductViews } from '@/hooks/useProductViews';
 
@@ -50,9 +49,12 @@ export default function HomePage() {
   const router = useRouter();
   const [products, setProducts] = React.useState<Product[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
+  const [countdownMessage, setCountdownMessage] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const [animatingButtons, setAnimatingButtons] = useState<Set<number>>(new Set());
   const [productErrors, setProductErrors] = useState<Map<number, string>>(new Map());
+  const [showFreeShippingBanner, setShowFreeShippingBanner] = useState(true);
+  const [showDiscountBanner, setShowDiscountBanner] = useState(true);
 
   // Search and filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,6 +79,7 @@ export default function HomePage() {
       const res = await fetch("/api/settings/go-live");
       const data = await res.json();
       if (data.goLiveTime) setGoLiveTime(data.goLiveTime);
+      if (data.countdownMessage) setCountdownMessage(data.countdownMessage);
     };
     fetchGoLive();
   }, []);
@@ -89,8 +92,13 @@ export default function HomePage() {
   // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
-      const { data, error } = await supabase.from("categories").select("id, name");
-      if (!error && data) setCategories(data);
+      try {
+        const res = await fetch('/api/categories');
+        const data = await res.json();
+        if (Array.isArray(data)) setCategories(data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
     };
     fetchCategories();
   }, []);
@@ -214,21 +222,42 @@ export default function HomePage() {
 
   return (
     <div className="max-w-full min-h-screen" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'}}>
-      <FreeShippingBanner />
       
-      {/* $10 Only Banner */}
-      <div className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 py-4 px-4 shadow-lg border-b border-blue-400">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-center">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl sm:text-3xl font-bold text-white">🔥</span>
-            <span className="text-xl sm:text-2xl font-bold text-white">EVERYTHING</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-3xl sm:text-4xl font-black text-yellow-300 drop-shadow-lg">ONLY $10!</span>
-            <span className="text-2xl sm:text-3xl font-bold text-white">🔥</span>
+      {/* Free Shipping Banner */}
+      {showFreeShippingBanner && (
+        <div className="bg-green-600 text-white text-center py-2 px-4 relative">
+          <div className="flex items-center justify-center">
+            <span className="text-sm font-medium">
+              🚚 FREE SHIPPING on orders $100 or more! 🎉
+            </span>
+            <button
+              onClick={() => setShowFreeShippingBanner(false)}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-200 text-lg font-bold"
+              aria-label="Close banner"
+            >
+              ×
+            </button>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Discount Banner */}
+      {showDiscountBanner && (
+        <div className="bg-blue-600 text-white text-center py-2 px-4 relative">
+          <div className="flex items-center justify-center">
+            <span className="text-sm font-medium">
+              🔥 Everything Only $19.99 or less! 🔥
+            </span>
+            <button
+              onClick={() => setShowDiscountBanner(false)}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-200 text-lg font-bold"
+              aria-label="Close banner"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {goLiveDate && countdown && (isBeforeGoLive || countdown.days > 0 || countdown.hours > 0 || countdown.minutes > 0 || countdown.seconds > 0) && (
         <div 
@@ -301,6 +330,11 @@ export default function HomePage() {
                 </div>
               </div>
               <h3 className="text-3xl sm:text-4xl font-bold mb-8 text-center">ARE YOU READY?</h3>
+              {countdownMessage && (
+                <div className="text-2xl sm:text-3xl font-semibold mb-6 text-center max-w-4xl px-4">
+                  {countdownMessage}
+                </div>
+              )}
               <div className="text-xl sm:text-2xl tracking-widest font-mono mb-4">KTWHOLESALEFINDS.COM</div>
               
               {/* Interactive Hint */}

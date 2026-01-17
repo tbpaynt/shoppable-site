@@ -13,16 +13,6 @@ export default function ShippingPage() {
             </p>
           </div>
 
-          {/* Free Shipping Banner */}
-          <div className="bg-green-900/30 border border-green-700 rounded-lg p-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-green-300 mb-2">🎉 FREE SHIPPING</h2>
-              <p className="text-xl text-green-200 mb-2">On Orders $100 or More!</p>
-              <p className="text-gray-300">
-                Spend $100 or more and enjoy free shipping on your entire order. No coupon code needed!
-              </p>
-            </div>
-          </div>
 
           {/* Tracking Information */}
           <div className="bg-gray-800 p-6 rounded-lg">

@@ -29,23 +29,39 @@ export async function POST(req: NextRequest) {
 
     const { data: products, error } = await supabase
       .from("products")
-      .select("id, weight_oz")
+      .select("id, weight_oz, price")
       .in("id", items.map((i) => i.id));
 
     if (error) throw error;
 
-    const weightMap = new Map<number, number>();
-    products?.forEach((p) => weightMap.set(p.id, p.weight_oz || 0));
+    const productMap = new Map<number, { weight_oz: number; price: number }>();
+    products?.forEach((p) => productMap.set(p.id, { weight_oz: p.weight_oz || 0, price: p.price }));
 
+    // Calculate total order value
+    let totalOrderValue = 0;
     let totalWeightOz = 0;
+    
     for (const i of items) {
-      const w = weightMap.get(i.id);
-      if (w === undefined) {
-        return NextResponse.json({ error: `Product ${i.id} weight missing` }, { status: 400 });
+      const product = productMap.get(i.id);
+      if (!product) {
+        return NextResponse.json({ error: `Product ${i.id} not found` }, { status: 400 });
       }
-      totalWeightOz += w * i.quantity;
+      totalOrderValue += product.price * i.quantity;
+      totalWeightOz += product.weight_oz * i.quantity;
     }
 
+    // Free shipping on orders $100+
+    if (totalOrderValue >= 100) {
+      return NextResponse.json({
+        rateId: "free_shipping",
+        provider: "Free Shipping",
+        service: "Free Shipping on Orders $100+",
+        amount: 0,
+        currency: "USD"
+      });
+    }
+
+    // Fallback to dynamic shipping for orders under $100
     const rate = await getCheapestRate(totalWeightOz, address);
     return NextResponse.json(rate);
   } catch (err: unknown) {

@@ -43,6 +43,8 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -120,26 +122,77 @@ export default function ProductDetailPage() {
         <ViewerCountBadge productId={product.id} className="mb-2" />
       </div>
       <div className="mb-4 flex gap-4">
-        {isValidImageUrl(product.image) ? (
-          <Image src={product.image} alt={product.name} width={256} height={256} className="h-64 w-64 object-cover rounded border" />
-        ) : (
-          <div className="h-64 w-64 bg-gray-700 rounded border flex items-center justify-center">
-            <span className="text-gray-400">No Image</span>
-          </div>
-        )}
-        {images && images.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {images.map((img, idx) => (
-              isValidImageUrl(img.image_url) ? (
-                <Image key={idx} src={img.image_url} alt={`Product image ${idx + 2}`} width={80} height={80} className="h-20 w-20 object-cover rounded border" />
-              ) : (
-                <div key={idx} className="h-20 w-20 bg-gray-700 rounded border flex items-center justify-center">
-                  <span className="text-gray-400 text-xs">No Img</span>
+        {/* Main Image Display */}
+        <div className="relative">
+          {(() => {
+            // Create array with main product image + additional images
+            const allImages = [
+              { url: product.image, isMain: true },
+              ...images.map(img => ({ url: img.image_url, isMain: false }))
+            ].filter(img => isValidImageUrl(img.url));
+            
+            const selectedImage = allImages[selectedImageIndex];
+            
+            if (selectedImage) {
+              return (
+                <button
+                  onClick={() => setShowImageModal(true)}
+                  className="h-64 w-64 rounded border overflow-hidden hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <Image 
+                    src={selectedImage.url} 
+                    alt={product.name} 
+                    width={256} 
+                    height={256} 
+                    className="h-full w-full object-cover" 
+                  />
+                </button>
+              );
+            } else {
+              return (
+                <div className="h-64 w-64 bg-gray-700 rounded border flex items-center justify-center">
+                  <span className="text-gray-400">No Image</span>
                 </div>
-              )
-            ))}
-          </div>
-        )}
+              );
+            }
+          })()}
+        </div>
+        
+        {/* Thumbnail Images */}
+        {(() => {
+          // Create array with main product image + additional images
+          const allImages = [
+            { url: product.image, isMain: true },
+            ...images.map(img => ({ url: img.image_url, isMain: false }))
+          ].filter(img => isValidImageUrl(img.url));
+          
+          if (allImages.length > 1) {
+            return (
+              <div className="flex flex-col gap-2">
+                {allImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImageIndex(idx)}
+                    className={`h-20 w-20 object-cover rounded border transition-all ${
+                      selectedImageIndex === idx 
+                        ? 'ring-2 ring-blue-500 border-blue-500' 
+                        : 'border-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    <Image 
+                      src={img.url} 
+                      alt={`Product image ${idx + 1}`} 
+                      width={80} 
+                      height={80} 
+                      className="h-full w-full object-cover rounded" 
+                    />
+                  </button>
+                ))}
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
       <div className="mb-4">
         <span className="text-xl font-semibold text-green-400 mr-4">${product.price.toFixed(2)}</span>
@@ -171,6 +224,44 @@ export default function ProductDetailPage() {
           Buy
         </button>
       </div>
+      
+      {/* Image Modal */}
+      {showImageModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowImageModal(false)}
+        >
+          <div className="relative max-w-4xl max-h-full">
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute top-4 right-4 text-white text-2xl font-bold hover:text-gray-300 z-10 bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center"
+            >
+              ×
+            </button>
+            {(() => {
+              const allImages = [
+                { url: product.image, isMain: true },
+                ...images.map(img => ({ url: img.image_url, isMain: false }))
+              ].filter(img => isValidImageUrl(img.url));
+              
+              const selectedImage = allImages[selectedImageIndex];
+              
+              if (selectedImage) {
+                return (
+                  <Image 
+                    src={selectedImage.url} 
+                    alt={product.name} 
+                    width={800} 
+                    height={600} 
+                    className="max-w-full max-h-full object-contain rounded"
+                  />
+                );
+              }
+              return null;
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

@@ -48,6 +48,7 @@ export default function ProductListPage({}) {
   const router = useRouter();
   const [products, setProducts] = React.useState<Product[]>([]);
   const [goLiveTime, setGoLiveTime] = useState<string | null>(null);
+  const [countdownMessage, setCountdownMessage] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
@@ -65,6 +66,7 @@ export default function ProductListPage({}) {
       const res = await fetch("/api/settings/go-live");
       const data = await res.json();
       if (data.goLiveTime) setGoLiveTime(data.goLiveTime);
+      if (data.countdownMessage) setCountdownMessage(data.countdownMessage);
     };
     fetchGoLive();
   }, []);
@@ -171,6 +173,11 @@ export default function ProductListPage({}) {
                 </div>
               </div>
               <h3 className="text-3xl sm:text-4xl font-bold mb-8 text-center">ARE YOU READY?</h3>
+              {countdownMessage && (
+                <div className="text-2xl sm:text-3xl font-semibold mb-6 text-center max-w-4xl px-4">
+                  {countdownMessage}
+                </div>
+              )}
               <div className="text-xl sm:text-2xl tracking-widest font-mono mb-4">KTWHOLESALEFINDS.COM</div>
               
               {/* Interactive Hint */}

@@ -96,16 +96,13 @@ export default function CartPage() {
 
   const productTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   
-  // Check if order qualifies for free shipping ($100 or more)
-  const qualifiesForFreeShipping = productTotal >= 100;
+  // Free shipping threshold
+  const FREE_SHIPPING_THRESHOLD = 100;
+  const isEligibleForFreeShipping = productTotal >= FREE_SHIPPING_THRESHOLD;
+  const amountNeededForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - productTotal);
   
   // Use dynamic quote if available else per-item shipping cost fallback
-  let shippingTotal = shippingQuote !== null ? shippingQuote : cart.reduce((sum, item) => sum + (item.shipping_cost || 0) * item.quantity, 0);
-  
-  // Apply free shipping if order qualifies
-  if (qualifiesForFreeShipping) {
-    shippingTotal = 0;
-  }
+  const shippingTotal = shippingQuote !== null ? shippingQuote : cart.reduce((sum, item) => sum + (item.shipping_cost || 0) * item.quantity, 0);
   
   const taxableBase = productTotal + shippingTotal;
   const taxTotal = +(taxableBase * TAX_RATE).toFixed(2);
@@ -225,17 +222,33 @@ export default function CartPage() {
                 <span>Items Subtotal</span>
                 <span>${productTotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-sm font-normal">
-                <span>Shipping</span>
-                <span className={qualifiesForFreeShipping ? "text-green-600" : ""}>
-                  {qualifiesForFreeShipping ? "FREE" : `$${shippingTotal.toFixed(2)}`}
-                </span>
-              </div>
-              {qualifiesForFreeShipping && (
-                <div className="text-green-600 text-xs text-center">
-                  🎉 Free shipping applied on orders $100+
+              
+              {/* Free Shipping Progress */}
+              {!isEligibleForFreeShipping && amountNeededForFreeShipping > 0 && (
+                <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded text-sm">
+                  <div className="flex justify-between items-center">
+                    <span>Add ${amountNeededForFreeShipping.toFixed(2)} more for FREE shipping!</span>
+                    <span className="text-xs">({((productTotal / FREE_SHIPPING_THRESHOLD) * 100).toFixed(0)}% there)</span>
+                  </div>
+                  <div className="w-full bg-green-200 rounded-full h-2 mt-1">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${Math.min((productTotal / FREE_SHIPPING_THRESHOLD) * 100, 100)}%` }}
+                    ></div>
+                  </div>
                 </div>
               )}
+              
+              {isEligibleForFreeShipping && (
+                <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded text-sm">
+                  🎉 You qualify for FREE shipping!
+                </div>
+              )}
+              
+              <div className="flex justify-between text-sm font-normal">
+                <span>Shipping</span>
+                <span>{isEligibleForFreeShipping ? 'FREE' : `$${shippingTotal.toFixed(2)}`}</span>
+              </div>
               <div className="flex justify-between text-sm font-normal">
                 <span>Tax (6%)</span>
                 <span>${taxTotal.toFixed(2)}</span>
@@ -377,13 +390,6 @@ export default function CartPage() {
           <div className="flex justify-between items-center mb-6">
             <button className="text-gray-600 underline" onClick={clearCart}>Clear Cart</button>
             <div className="text-right">
-              {qualifiesForFreeShipping ? (
-                <div className="text-green-600 font-semibold text-sm mb-1">🎉 FREE SHIPPING APPLIED!</div>
-              ) : (
-                <div className="text-gray-600 text-sm mb-1">
-                  Add ${(100 - productTotal).toFixed(2)} more for FREE SHIPPING
-                </div>
-              )}
               <div className="text-xl font-bold">Total: ${total.toFixed(2)}</div>
             </div>
           </div>
