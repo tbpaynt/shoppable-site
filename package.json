@@ -16,7 +16,7 @@
     "@types/nodemailer": "^6.4.17",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.0.1",
-    "next": "15.3.3",
+    "next": "15.3.8",
     "next-auth": "^5.0.0-beta",
     "nodemailer": "^6.10.1",
     "react": "^19.0.0",
