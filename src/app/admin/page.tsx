@@ -602,7 +602,7 @@ export default function AdminPage() {
     }
 
     try {
-      const results = await Promise.all(updates);
+      await Promise.all(updates);
       // Refresh product list
       const res = await fetch("/api/products");
       const data = await res.json();

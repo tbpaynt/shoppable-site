@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from "react";
 import type { Product } from './products';
 import Image from 'next/image';
-import { supabase } from '../utils/supabaseClient';
 import ViewerCountBadge from '@/components/ViewerCountBadge';
 import { useProductViews } from '@/hooks/useProductViews';
 
