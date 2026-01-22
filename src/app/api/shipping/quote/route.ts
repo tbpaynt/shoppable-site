@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getCheapestRate } from "../../../../utils/shippo";
 
 interface CartItem {
   id: number;

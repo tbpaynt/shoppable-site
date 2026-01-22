@@ -66,7 +66,7 @@ export async function GET() {
             if (address?.name) {
               customerName = address.name;
             }
-          } catch (e) {
+          } catch {
             // If parsing fails, continue to next source
           }
         }

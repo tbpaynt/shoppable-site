@@ -53,7 +53,6 @@ export default function CartPage() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
-  const [loadingAddresses, setLoadingAddresses] = useState(false);
 
   const TAX_RATE = 0.06; // 6% sales tax – adjust per locale
 
@@ -61,7 +60,6 @@ export default function CartPage() {
   useEffect(() => {
     const fetchSavedAddresses = async () => {
       if (status === "authenticated" && session?.user) {
-        setLoadingAddresses(true);
         try {
           const res = await fetch('/api/addresses');
           if (res.ok) {
@@ -88,13 +86,11 @@ export default function CartPage() {
           }
         } catch (e) {
           console.error('Error fetching saved addresses:', e);
-        } finally {
-          setLoadingAddresses(false);
         }
       }
     };
     fetchSavedAddresses();
-  }, [status, session?.user?.email]);
+  }, [status, session?.user]);
 
   // Trigger quote when cart or address changes
   useEffect(() => {
