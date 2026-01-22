@@ -39,7 +39,6 @@ export async function POST(req: NextRequest) {
 
     // Calculate total order value
     let totalOrderValue = 0;
-    let totalWeightOz = 0;
     
     for (const i of items) {
       const product = productMap.get(i.id);
@@ -47,23 +46,31 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Product ${i.id} not found` }, { status: 400 });
       }
       totalOrderValue += product.price * i.quantity;
-      totalWeightOz += product.weight_oz * i.quantity;
     }
 
-    // Free shipping on orders $100+
-    if (totalOrderValue >= 100) {
+    console.log(`[Shipping Quote] Order value: $${totalOrderValue}, Items: ${items.length}`);
+
+    // Free shipping on orders $150+
+    if (totalOrderValue >= 150) {
+      console.log(`[Shipping Quote] Free shipping applied (order >= $150)`);
       return NextResponse.json({
         rateId: "free_shipping",
         provider: "Free Shipping",
-        service: "Free Shipping on Orders $100+",
+        service: "Free Shipping on Orders $150+",
         amount: 0,
         currency: "USD"
       });
     }
 
-    // Fallback to dynamic shipping for orders under $100
-    const rate = await getCheapestRate(totalWeightOz, address);
-    return NextResponse.json(rate);
+    // Flat rate shipping of $16.95 for orders under $150
+    console.log(`[Shipping Quote] Flat rate shipping: $16.95 (order < $150)`);
+    return NextResponse.json({
+      rateId: "flat_rate_shipping",
+      provider: "Standard Shipping",
+      service: "Flat Rate Shipping",
+      amount: 16.95,
+      currency: "USD"
+    });
   } catch (err: unknown) {
     console.error("Shipping quote error", err);
     const msg = (err as Error).message || "Server error";

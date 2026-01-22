@@ -103,6 +103,7 @@ export default function AdminPage() {
     total_amount: number;
     status: string;
     user_email?: string | null;
+    customer_name?: string | null;
     order_items: { id: string; name: string; quantity: number; price: number }[];
   };
   const [orders, setOrders] = useState<OrderSummary[]>([]);
@@ -365,7 +366,11 @@ export default function AdminPage() {
                 <span>${new Date(order.created_at).toLocaleString()}</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Customer:</span>
+                <span class="info-label">Customer Name:</span>
+                <span>${order.customer_name || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Customer Email:</span>
                 <span>${order.user_email || 'N/A'}</span>
               </div>
               <div class="info-item">
@@ -1070,6 +1075,7 @@ export default function AdminPage() {
                 <th className="text-left p-2">Order ID</th>
                 <th className="text-left p-2">Date</th>
                 <th className="text-left p-2">Customer</th>
+                <th className="text-left p-2">Email</th>
                 <th className="text-left p-2">Total</th>
                 <th className="text-left p-2">Status</th>
                 <th className="text-left p-2">Items</th>
@@ -1084,6 +1090,7 @@ export default function AdminPage() {
                   >
                     <td className="p-2 font-mono">{order.id}</td>
                     <td className="p-2">{new Date(order.created_at).toLocaleString()}</td>
+                    <td className="p-2">{order.customer_name ?? 'N/A'}</td>
                     <td className="p-2">{order.user_email ?? 'N/A'}</td>
                     <td className="p-2">${order.total_amount.toFixed(2)}</td>
                     <td className="p-2">
@@ -1106,7 +1113,7 @@ export default function AdminPage() {
                   </tr>
                   {expandedOrder === order.id && (
                     <tr key={`${order.id}-details`}>
-                      <td colSpan={6} className="p-4 bg-gray-800 border-t border-gray-700">
+                      <td colSpan={7} className="p-4 bg-gray-800 border-t border-gray-700">
                         <div className="ml-4">
                           <div className="flex items-center justify-between mb-3">
                             <h3 className="text-lg font-semibold">Order Items</h3>

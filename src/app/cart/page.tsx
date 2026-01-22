@@ -52,8 +52,49 @@ export default function CartPage() {
   const [shippingRateId, setShippingRateId] = useState<string | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
 
   const TAX_RATE = 0.06; // 6% sales tax – adjust per locale
+
+  // Fetch saved addresses when user is logged in
+  useEffect(() => {
+    const fetchSavedAddresses = async () => {
+      if (status === "authenticated" && session?.user) {
+        setLoadingAddresses(true);
+        try {
+          const res = await fetch('/api/addresses');
+          if (res.ok) {
+            const data = await res.json();
+            setSavedAddresses(data.addresses || []);
+            
+            // Pre-fill form with default address if available and form is empty
+            const defaultAddress = data.addresses?.find((addr: any) => addr.is_default) || data.addresses?.[0];
+            if (defaultAddress) {
+              // Only pre-fill if form is completely empty
+              setAddress(prev => {
+                if (!prev.name && !prev.street1 && !prev.city && !prev.state && !prev.zip) {
+                  return {
+                    name: defaultAddress.name || "",
+                    street1: defaultAddress.street1 || "",
+                    city: defaultAddress.city || "",
+                    state: defaultAddress.state || "",
+                    zip: defaultAddress.zip || "",
+                  };
+                }
+                return prev;
+              });
+            }
+          }
+        } catch (e) {
+          console.error('Error fetching saved addresses:', e);
+        } finally {
+          setLoadingAddresses(false);
+        }
+      }
+    };
+    fetchSavedAddresses();
+  }, [status, session?.user?.email]);
 
   // Trigger quote when cart or address changes
   useEffect(() => {
@@ -81,6 +122,7 @@ export default function CartPage() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Quote failed");
+        console.log('[Cart] Shipping quote received:', { amount: data.amount, rateId: data.rateId });
         setShippingQuote(data.amount);
         setShippingRateId(data.rateId);
       } catch (e: any) {
@@ -97,26 +139,92 @@ export default function CartPage() {
   const productTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   
   // Free shipping threshold
-  const FREE_SHIPPING_THRESHOLD = 100;
+  const FREE_SHIPPING_THRESHOLD = 150;
   const isEligibleForFreeShipping = productTotal >= FREE_SHIPPING_THRESHOLD;
   const amountNeededForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - productTotal);
   
-  // Use dynamic quote if available else per-item shipping cost fallback
-  const shippingTotal = shippingQuote !== null ? shippingQuote : cart.reduce((sum, item) => sum + (item.shipping_cost || 0) * item.quantity, 0);
+  // Use dynamic quote if available, otherwise use flat rate as default for orders under $150
+  // Only fall back to per-item shipping if quote hasn't been fetched yet and address isn't provided
+  const hasAddress = address.name && address.street1 && address.city && address.state && address.zip;
+  const shippingTotal = shippingQuote !== null 
+    ? shippingQuote 
+    : (hasAddress 
+        ? 16.95 // Default flat rate while quote is loading
+        : cart.reduce((sum, item) => sum + (item.shipping_cost || 0) * item.quantity, 0));
   
   const taxableBase = productTotal + shippingTotal;
-  const taxTotal = +(taxableBase * TAX_RATE).toFixed(2);
-  const total = productTotal + shippingTotal + taxTotal;
+  const taxTotal = hasAddress ? +(taxableBase * TAX_RATE).toFixed(2) : 0;
+  const total = productTotal + shippingTotal + (hasAddress ? taxTotal : 0);
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+
+    // Validate that we have an address (either from form or saved)
+    const hasFormAddress = address.name && address.street1 && address.city && address.state && address.zip;
+    const hasSavedAddress = savedAddresses && savedAddresses.length > 0;
+    
+    if (!hasFormAddress && !hasSavedAddress) {
+      setError("Shipping address is required. Please enter a shipping address below or save one in your profile.");
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
+      // Validate stock before checkout and remove out-of-stock items
+      const validatedItems: { id: number; quantity: number }[] = [];
+      const removedItems: string[] = [];
+      
+      for (const item of cart) {
+        try {
+          const response = await fetch(`/api/products/${item.id}`);
+          if (response.ok) {
+            const product = await response.json();
+            const availableStock = product.stock || 0;
+            
+            if (availableStock >= item.quantity) {
+              validatedItems.push({ id: item.id, quantity: item.quantity });
+            } else if (availableStock > 0) {
+              // Partial stock available - adjust quantity
+              validatedItems.push({ id: item.id, quantity: availableStock });
+              removedItems.push(`${item.name}: quantity reduced from ${item.quantity} to ${availableStock} (only ${availableStock} available)`);
+              // Update cart with reduced quantity
+              await updateQuantity(item.id, availableStock);
+            } else {
+              // Out of stock - remove from cart
+              removedItems.push(`${item.name}: removed (out of stock)`);
+              removeFromCart(item.id);
+            }
+          } else {
+            // Product not found - remove from cart
+            removedItems.push(`${item.name}: removed (product not found)`);
+            removeFromCart(item.id);
+          }
+        } catch (e) {
+          console.error(`Error validating product ${item.id}:`, e);
+          // On error, try to include it anyway (server will catch it)
+          validatedItems.push({ id: item.id, quantity: item.quantity });
+        }
+      }
+      
+      // If items were removed, show error and stop
+      if (removedItems.length > 0) {
+        setError(`Cart updated: ${removedItems.join('; ')}. Please review your cart and try again.`);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If no items left after validation, stop
+      if (validatedItems.length === 0) {
+        setError('No items available for checkout. Your cart has been cleared.');
+        clearCart();
+        setIsLoading(false);
+        return;
+      }
+
       const payload: any = {
-        items: cart.map(item => ({ id: item.id, quantity: item.quantity })),
+        items: validatedItems,
       };
       
       // Always include address if provided
@@ -131,11 +239,38 @@ export default function CartPage() {
         };
       }
       
-      // Include shipping info if available
+      // Include shipping info if available (even if 0 for free shipping)
       if (shippingQuote !== null && shippingRateId) {
-        payload.shipAmount = shippingQuote;
+        payload.shipAmount = shippingQuote; // This can be 0 for free shipping
         payload.rateId = shippingRateId;
         payload.taxAmount = taxTotal;
+      } else if (address.name && address.street1 && address.city && address.state && address.zip) {
+        // If address is provided but quote hasn't loaded yet, fetch it now
+        try {
+          const quoteRes = await fetch("/api/shipping/quote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: cart.map((c) => ({ id: c.id, quantity: c.quantity })),
+              address: {
+                name: address.name,
+                street1: address.street1,
+                city: address.city,
+                state: address.state,
+                zip: address.zip,
+                country: "US",
+              },
+            }),
+          });
+          const quoteData = await quoteRes.json();
+          if (quoteRes.ok && quoteData.amount !== undefined) {
+            payload.shipAmount = quoteData.amount;
+            payload.rateId = quoteData.rateId;
+            payload.taxAmount = taxTotal;
+          }
+        } catch (e) {
+          console.error("Failed to fetch shipping quote during checkout:", e);
+        }
       }
 
       const response = await fetch('/api/create-payment-intent', {
@@ -154,6 +289,16 @@ export default function CartPage() {
           const errJson = await response.json();
           if (errJson && typeof errJson.error === 'string') {
             message = errJson.error;
+            
+            // Try to enhance error message with product names if it mentions product IDs
+            const productIdMatch = message.match(/product[^\d]*(\d+)/i) || message.match(/"(\d+)"/);
+            if (productIdMatch) {
+              const productId = parseInt(productIdMatch[1]);
+              const cartItem = cart.find(item => item.id === productId);
+              if (cartItem) {
+                message = message.replace(/product[^\d]*\d+/i, cartItem.name).replace(/"\d+"/, `"${cartItem.name}"`);
+              }
+            }
           }
         } catch {
           // maybe body isn't JSON; try plain text from clone
@@ -259,6 +404,29 @@ export default function CartPage() {
               </div>
             </div>
           </div>
+          
+          {/* Shipping Address Display */}
+          {(() => {
+            // Determine which address to display - form address or saved address
+            const formAddress = (address.name && address.street1 && address.city && address.state && address.zip) ? address : null;
+            const savedAddress = savedAddresses?.find((addr: any) => addr.is_default) || savedAddresses?.[0];
+            const displayAddress = formAddress || savedAddress;
+            
+            return displayAddress ? (
+              <div className="mb-6 border-t pt-4">
+                <h2 className="text-lg font-semibold mb-2">Shipping Address</h2>
+                <div className="text-sm text-gray-700 space-y-1">
+                  <div className="font-medium">{displayAddress.name}</div>
+                  <div>{displayAddress.street1}</div>
+                  {displayAddress.street2 && <div>{displayAddress.street2}</div>}
+                  <div>{displayAddress.city}, {displayAddress.state} {displayAddress.zip}</div>
+                  {!formAddress && savedAddress && (
+                    <div className="text-xs text-gray-500 mt-2 italic">Using your saved default address</div>
+                  )}
+                </div>
+              </div>
+            ) : null;
+          })()}
         </div>
         <CheckoutForm
           clientSecret={clientSecret}
@@ -289,14 +457,54 @@ export default function CartPage() {
       ) : (
         <>
           {/* Shipping address */}
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Recipient Name"
-              value={address.name}
-              onChange={(e) => setAddress({ ...address, name: e.target.value })}
-              className="p-2 border rounded text-black col-span-1 md:col-span-2"
-            />
+          <div className="mb-6">
+            {/* Saved Addresses Selector */}
+            {savedAddresses.length > 0 && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Use Saved Address:
+                </label>
+                <select
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    if (selectedId) {
+                      const selected = savedAddresses.find(addr => addr.id === selectedId);
+                      if (selected) {
+                        setAddress({
+                          name: selected.name || "",
+                          street1: selected.street1 || "",
+                          city: selected.city || "",
+                          state: selected.state || "",
+                          zip: selected.zip || "",
+                        });
+                      }
+                    }
+                  }}
+                  className="w-full p-2 border rounded text-black mb-2"
+                  defaultValue=""
+                >
+                  <option value="">Select a saved address...</option>
+                  {savedAddresses.map((addr: any) => (
+                    <option key={addr.id} value={addr.id}>
+                      {addr.name} - {addr.street1}, {addr.city}, {addr.state} {addr.zip}
+                      {addr.is_default ? " (Default)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-600">
+                  Or enter a new address below. If you proceed without entering an address, your default saved address will be used.
+                </p>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Recipient Name"
+                value={address.name}
+                onChange={(e) => setAddress({ ...address, name: e.target.value })}
+                className="p-2 border rounded text-black col-span-1 md:col-span-2"
+              />
             <input
               type="text"
               placeholder="Street Address"
@@ -325,8 +533,9 @@ export default function CartPage() {
               onChange={(e) => setAddress({ ...address, zip: e.target.value })}
               className="p-2 border rounded text-black"
             />
-            {quoteLoading && <span className="text-white">Calculating shipping…</span>}
-            {quoteError && <span className="text-red-400">{quoteError}</span>}
+            {quoteLoading && <span className="text-gray-600 text-sm col-span-1 md:col-span-2">Calculating shipping…</span>}
+            {quoteError && <span className="text-red-600 text-sm col-span-1 md:col-span-2">{quoteError}</span>}
+            </div>
           </div>
           <table className="w-full mb-6">
             <thead>
@@ -387,10 +596,68 @@ export default function CartPage() {
               ))}
             </tbody>
           </table>
-          <div className="flex justify-between items-center mb-6">
-            <button className="text-gray-600 underline" onClick={clearCart}>Clear Cart</button>
-            <div className="text-right">
-              <div className="text-xl font-bold">Total: ${total.toFixed(2)}</div>
+          
+          {/* Cart Summary */}
+          <div className="mb-6 border-t pt-4">
+            <div className="flex justify-between items-center mb-2">
+              <button className="text-gray-600 underline" onClick={clearCart}>Clear Cart</button>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Items Subtotal</span>
+                <span>${productTotal.toFixed(2)}</span>
+              </div>
+              
+              {/* Free Shipping Progress */}
+              {!isEligibleForFreeShipping && amountNeededForFreeShipping > 0 && (
+                <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded text-sm">
+                  <div className="flex justify-between items-center">
+                    <span>Add ${amountNeededForFreeShipping.toFixed(2)} more for FREE shipping!</span>
+                    <span className="text-xs">({((productTotal / FREE_SHIPPING_THRESHOLD) * 100).toFixed(0)}% there)</span>
+                  </div>
+                  <div className="w-full bg-green-200 rounded-full h-2 mt-1">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${Math.min((productTotal / FREE_SHIPPING_THRESHOLD) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              
+              {isEligibleForFreeShipping && (
+                <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded text-sm">
+                  🎉 You qualify for FREE shipping!
+                </div>
+              )}
+              
+              <div className="flex justify-between text-sm">
+                <span>Shipping</span>
+                <span>
+                  {quoteLoading ? (
+                    <span className="text-gray-500">Calculating...</span>
+                  ) : isEligibleForFreeShipping ? (
+                    'FREE'
+                  ) : shippingQuote !== null ? (
+                    `$${shippingTotal.toFixed(2)}`
+                  ) : hasAddress ? (
+                    <span className="text-gray-500">$16.95 (estimated)</span>
+                  ) : (
+                    <span className="text-gray-500">Enter address</span>
+                  )}
+                </span>
+              </div>
+              
+              {hasAddress && (
+                <div className="flex justify-between text-sm">
+                  <span>Tax (6%)</span>
+                  <span>${taxTotal.toFixed(2)}</span>
+                </div>
+              )}
+              
+              <div className="flex justify-between text-lg font-bold border-t pt-2">
+                <span>Total:</span>
+                <span>${total.toFixed(2)}</span>
+              </div>
             </div>
           </div>
           {error && (
