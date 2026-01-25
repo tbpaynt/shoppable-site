@@ -123,8 +123,8 @@ export default function ProductListPage({}) {
                 {publishedProducts.slice(0, 10).map(product => (
                   <div key={product.id} className="block bg-gray-800 rounded shadow p-3 text-white border border-gray-700">
                     {isValidImageUrl(product.image) ? (
-                      <div className="bg-gray-700 rounded mb-3 overflow-hidden">
-                        <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover" />
+                      <div className="bg-gray-700 rounded mb-3 overflow-hidden flex items-center justify-center" style={{ minHeight: '128px' }}>
+                        <Image src={product.image} alt={product.name} width={300} height={128} className="max-h-32 w-full object-contain" />
                       </div>
                     ) : (
                       <div className="bg-gray-700 rounded mb-3 h-32 w-full flex items-center justify-center">
@@ -195,33 +195,33 @@ export default function ProductListPage({}) {
                       <div className="text-xl mb-8 text-center italic">or someone else will 😎</div>
           <div className="max-w-7xl w-full px-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {publishedProducts.map(product => (
-              <div key={product.id} className="block bg-white rounded shadow hover:shadow-lg transition p-3 text-gray-900">
+              <div key={product.id} className="block bg-gray-800 rounded shadow hover:shadow-lg transition p-3 text-white border border-gray-700">
                 <Link href={`/products/${product.id}`} onClick={() => trackView(product.id)}>
                   {isValidImageUrl(product.image) ? (
-                    <div className="relative">
-                      <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover rounded mb-3" />
+                    <div className="bg-gray-700 rounded mb-3 overflow-hidden relative flex items-center justify-center" style={{ minHeight: '128px' }}>
+                      <Image src={product.image} alt={product.name} width={300} height={128} className="max-h-32 w-full object-contain" />
                       <div className="absolute top-2 left-2">
                         <ViewerCountBadge productId={product.id} />
                       </div>
                     </div>
                   ) : (
-                    <div className="h-32 w-full bg-gray-200 rounded mb-3 flex items-center justify-center relative">
-                      <span className="text-gray-500 text-sm">No Image</span>
+                    <div className="h-32 w-full bg-gray-700 rounded mb-3 flex items-center justify-center relative">
+                      <span className="text-gray-400 text-sm">No Image</span>
                       <div className="absolute top-2 left-2">
                         <ViewerCountBadge productId={product.id} />
                       </div>
                     </div>
                   )}
-                  <div className="font-semibold text-base mb-1">{product.name}</div>
-                  <div className="mb-1 text-gray-600 text-sm">Listing #: {product.listing_number}</div>
-                  <div className="mb-1 text-gray-600 text-sm">Stock: {product.stock ?? 0}</div>
+                  <div className="font-semibold text-base mb-1 text-white">{product.name}</div>
+                  <div className="mb-1 text-gray-300 text-sm">Listing #: {product.listing_number}</div>
+                  <div className="mb-1 text-gray-300 text-sm">Stock: {product.stock ?? 0}</div>
                   <div className="mb-2">
-                    <span className="text-green-700 font-bold mr-2 text-lg">${product.price.toFixed(2)}</span>
+                    <span className="text-green-400 font-bold mr-2 text-lg">${product.price.toFixed(2)}</span>
                     <span className="line-through text-gray-500 text-sm">${product.retail.toFixed(2)}</span>
                   </div>
-                  <div className="text-xs text-gray-700 line-clamp-2">{product.description}</div>
+                  <div className="text-xs text-gray-300 line-clamp-2">{product.description}</div>
                   {product.stock === 0 && (
-                    <div className="mt-2 text-red-600 font-bold text-sm">Sold Out</div>
+                    <div className="mt-2 text-red-400 font-bold text-sm">Sold Out</div>
                   )}
                 </Link>
                 <div className="flex gap-1 mt-3">

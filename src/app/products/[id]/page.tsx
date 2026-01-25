@@ -137,14 +137,14 @@ export default function ProductDetailPage() {
               return (
                 <button
                   onClick={() => setShowImageModal(true)}
-                  className="h-64 w-64 rounded border overflow-hidden hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="h-64 w-64 rounded border overflow-hidden hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-100 flex items-center justify-center"
                 >
                   <Image 
                     src={selectedImage.url} 
                     alt={product.name} 
                     width={256} 
                     height={256} 
-                    className="h-full w-full object-cover" 
+                    className="max-h-full max-w-full object-contain" 
                   />
                 </button>
               );
@@ -173,7 +173,7 @@ export default function ProductDetailPage() {
                   <button
                     key={idx}
                     onClick={() => setSelectedImageIndex(idx)}
-                    className={`h-20 w-20 object-cover rounded border transition-all ${
+                    className={`h-20 w-20 rounded border transition-all bg-gray-100 flex items-center justify-center ${
                       selectedImageIndex === idx 
                         ? 'ring-2 ring-blue-500 border-blue-500' 
                         : 'border-gray-600 hover:border-gray-400'
@@ -184,7 +184,7 @@ export default function ProductDetailPage() {
                       alt={`Product image ${idx + 1}`} 
                       width={80} 
                       height={80} 
-                      className="h-full w-full object-cover rounded" 
+                      className="max-h-full max-w-full object-contain rounded" 
                     />
                   </button>
                 ))}

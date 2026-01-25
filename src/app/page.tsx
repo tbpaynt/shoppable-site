@@ -279,8 +279,8 @@ export default function HomePage() {
                 {products.filter(p => p.published).slice(0, 10).map(product => (
                   <div key={product.id} className="block bg-gray-800 rounded shadow p-3 text-white border border-gray-700">
                     {isValidImageUrl(product.image) ? (
-                      <div className="bg-gray-700 rounded mb-3 overflow-hidden">
-                        <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover" />
+                      <div className="bg-gray-700 rounded mb-3 overflow-hidden flex items-center justify-center" style={{ minHeight: '128px' }}>
+                        <Image src={product.image} alt={product.name} width={300} height={128} className="max-h-32 w-full object-contain" />
                       </div>
                     ) : (
                       <div className="bg-gray-700 rounded mb-3 h-32 w-full flex items-center justify-center">
@@ -536,8 +536,8 @@ export default function HomePage() {
               <div key={product.id} className="block bg-gray-800 rounded shadow hover:shadow-lg transition p-3 text-white border border-gray-700">
                 <Link href={`/products/${product.id}`} onClick={() => trackView(product.id)}>
                   {isValidImageUrl(product.image) ? (
-                    <div className="bg-gray-700 rounded mb-3 overflow-hidden relative">
-                      <Image src={product.image} alt={product.name} width={300} height={128} className="h-32 w-full object-cover" />
+                    <div className="bg-gray-700 rounded mb-3 overflow-hidden relative flex items-center justify-center" style={{ minHeight: '128px' }}>
+                      <Image src={product.image} alt={product.name} width={300} height={128} className="max-h-32 w-full object-contain" />
                       <div className="absolute top-2 left-2">
                         <ViewerCountBadge productId={product.id} />
                       </div>

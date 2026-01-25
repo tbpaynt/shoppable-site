@@ -39,6 +39,7 @@ export default function CartPage() {
   const [showCheckout, setShowCheckout] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [quantityError, setQuantityError] = useState<string | null>(null);
+  const [quantityInputs, setQuantityInputs] = useState<Record<number, string>>({});
   
   // Address state for shipping quote
   const [address, setAddress] = useState({
@@ -446,10 +447,13 @@ export default function CartPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-8 bg-white rounded shadow text-gray-900">
-      <h1 className="text-2xl font-bold mb-6">Your Cart</h1>
+    <div className="max-w-3xl mx-auto p-8" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)', minHeight: '100vh'}}>
+      <h1 className="text-2xl font-bold mb-6 text-white">Your Cart</h1>
       {cart.length === 0 ? (
-        <div className="text-gray-500 mb-8">Your cart is empty. <Link href="/products" className="text-blue-600 underline">Shop now</Link></div>
+        <div className="bg-gray-800 rounded shadow p-6 border border-gray-700">
+          <p className="text-gray-300 mb-4">Your cart is empty.</p>
+          <Link href="/products" className="text-blue-400 hover:text-blue-300 underline font-medium">Shop now</Link>
+        </div>
       ) : (
         <>
           {/* Shipping address */}
@@ -564,15 +568,72 @@ export default function CartPage() {
                         type="number"
                         min={1}
                         max={item.stock || 999}
-                        value={item.quantity}
+                        value={quantityInputs[item.id] !== undefined ? quantityInputs[item.id] : item.quantity}
                         onChange={async (e) => {
-                          const newQuantity = parseInt(e.target.value) || 1;
-                          const result = await updateQuantity(item.id, newQuantity);
-                          if (!result.success) {
-                            setQuantityError(result.message);
-                            setTimeout(() => setQuantityError(null), 3000);
-                          } else {
-                            setQuantityError(null);
+                          const inputValue = e.target.value;
+                          // Store the raw input value for typing
+                          setQuantityInputs(prev => ({
+                            ...prev,
+                            [item.id]: inputValue
+                          }));
+                          
+                          // If it's a valid number (from spinner clicks), update immediately
+                          const numValue = parseInt(inputValue);
+                          if (!isNaN(numValue) && inputValue === numValue.toString()) {
+                            const finalQuantity = Math.max(1, Math.min(numValue, item.stock || 999));
+                            if (finalQuantity !== item.quantity) {
+                              const result = await updateQuantity(item.id, finalQuantity);
+                              if (!result.success) {
+                                setQuantityError(result.message);
+                                setTimeout(() => setQuantityError(null), 3000);
+                              } else {
+                                setQuantityError(null);
+                                // Clear local state after successful update
+                                setQuantityInputs(prev => {
+                                  const newState = { ...prev };
+                                  delete newState[item.id];
+                                  return newState;
+                                });
+                              }
+                            }
+                          }
+                        }}
+                        onBlur={async (e) => {
+                          // When user finishes editing, validate and update
+                          const inputValue = e.target.value.trim();
+                          if (inputValue === '') {
+                            // If empty, reset to current quantity
+                            setQuantityInputs(prev => {
+                              const newState = { ...prev };
+                              delete newState[item.id];
+                              return newState;
+                            });
+                            return;
+                          }
+                          const newQuantity = parseInt(inputValue) || 1;
+                          const finalQuantity = Math.max(1, Math.min(newQuantity, item.stock || 999));
+                          
+                          // Clear the local input state to sync with cart
+                          setQuantityInputs(prev => {
+                            const newState = { ...prev };
+                            delete newState[item.id];
+                            return newState;
+                          });
+                          
+                          if (finalQuantity !== item.quantity) {
+                            const result = await updateQuantity(item.id, finalQuantity);
+                            if (!result.success) {
+                              setQuantityError(result.message);
+                              setTimeout(() => setQuantityError(null), 3000);
+                            } else {
+                              setQuantityError(null);
+                            }
+                          }
+                        }}
+                        onKeyDown={async (e) => {
+                          // Update on Enter key
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
                           }
                         }}
                         className="w-16 p-1 border rounded text-black"

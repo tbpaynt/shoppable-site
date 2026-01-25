@@ -116,6 +116,7 @@ export default function AdminPage() {
     email: string;
     created_at: string;
     updated_at: string;
+    customer_name?: string | null;
   };
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
@@ -711,6 +712,41 @@ export default function AdminPage() {
     setCategoryLoading(false);
   };
 
+  // Helper function to download image from URL and convert to File
+  // Uses API route to bypass CORS restrictions
+  const downloadImageFromUrl = async (imageUrl: string): Promise<File | null> => {
+    try {
+      // Validate URL
+      if (!imageUrl || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+        return null;
+      }
+
+      // Fetch image via API route to bypass CORS
+      const response = await fetch(`/api/download-image?url=${encodeURIComponent(imageUrl)}`);
+
+      if (!response.ok) {
+        console.error(`Failed to download image from ${imageUrl}: ${response.status}`);
+        return null;
+      }
+
+      // Get image as blob
+      const blob = await response.blob();
+      
+      // Extract file extension from URL or default to jpg
+      const urlPath = new URL(imageUrl).pathname;
+      const ext = urlPath.match(/\.(jpg|jpeg|png|gif|webp)$/i)?.[1]?.toLowerCase() || 'jpg';
+      
+      // Create File object from blob
+      const fileName = `downloaded_${Date.now()}.${ext}`;
+      const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
+      
+      return file;
+    } catch (error) {
+      console.error(`Error downloading image from ${imageUrl}:`, error);
+      return null;
+    }
+  };
+
   // Bulk import functions
   const handleBulkImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -730,10 +766,43 @@ export default function AdminPage() {
         return;
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      // Helper function to properly parse CSV line (handles quoted values with commas)
+      const parseCSVLine = (line: string): string[] => {
+        const values: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          const nextChar = line[i + 1];
+          
+          if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+              // Escaped quote (double quote)
+              current += '"';
+              i++; // Skip next quote
+            } else {
+              // Toggle quote state
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            // End of field
+            values.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        
+        // Add the last field
+        values.push(current.trim());
+        return values;
+      };
+
+      const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
       const dataLines = lines.slice(1);
       
-      const requiredHeaders = ['listing_number', 'name', 'price', 'retail', 'description'];
+      const requiredHeaders = ['listing_number', 'name', 'price', 'retail'];
       const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
       
       if (missingHeaders.length > 0) {
@@ -746,7 +815,7 @@ export default function AdminPage() {
       const errors: string[] = [];
 
       dataLines.forEach((line, index) => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        const values = parseCSVLine(line).map(v => v.replace(/^"|"$/g, '')); // Remove surrounding quotes
         const product: any = { temp_id: `temp_${Date.now()}_${index}` };
         
         headers.forEach((header, idx) => {
@@ -841,25 +910,58 @@ export default function AdminPage() {
       
       try {
         const { temp_id, ...productData } = product;
-        let imageUrl = productData.image;
+        let imageUrl = productData.image || '';
 
-        // Upload image if file is selected
-        const imageFile = bulkProductImages[temp_id];
-        if (imageFile) {
-          const fileExt = imageFile.name.split('.').pop();
-          const fileName = `${Date.now()}_${temp_id}.${fileExt}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('product-images')
-            .upload(fileName, imageFile);
+        // Priority 1: Check if image column contains a URL - download it automatically
+        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+          try {
+            const downloadedFile = await downloadImageFromUrl(imageUrl);
+            
+            if (downloadedFile) {
+              // Upload downloaded image to Supabase storage
+              const fileExt = downloadedFile.name.split('.').pop();
+              const fileName = `${Date.now()}_${temp_id}.${fileExt}`;
+              
+              const { error: uploadError } = await supabaseAdmin.storage
+                .from('product-images')
+                .upload(fileName, downloadedFile);
 
-          if (uploadError) {
-            errors.push(`Product "${product.name}": Image upload failed - ${uploadError.message}`);
-            setBulkImportProgress(((i + 1) / bulkProducts.length) * 100);
-            continue;
+              if (!uploadError) {
+                imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${fileName}`;
+                console.log(`✓ Successfully downloaded and uploaded image for "${product.name}"`);
+              } else {
+                console.warn(`Failed to upload downloaded image for "${product.name}": ${uploadError.message}`);
+                // Fall through to manual file upload or use original URL
+              }
+            } else {
+              console.warn(`Failed to download image from URL for "${product.name}"`);
+              // Fall through to manual file upload or use original URL
+            }
+          } catch (downloadError) {
+            console.error(`Error downloading image for "${product.name}":`, downloadError);
+            // Fall through to manual file upload or use original URL
           }
+        }
 
-          imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${fileName}`;
+        // Priority 2: If URL download failed or no URL, check for manual file upload
+        if (!imageUrl || (!imageUrl.startsWith('http') && !imageUrl.startsWith('/'))) {
+          const imageFile = bulkProductImages[temp_id];
+          if (imageFile) {
+            const fileExt = imageFile.name.split('.').pop();
+            const fileName = `${Date.now()}_${temp_id}.${fileExt}`;
+            
+            const { error: uploadError } = await supabaseAdmin.storage
+              .from('product-images')
+              .upload(fileName, imageFile);
+
+            if (uploadError) {
+              errors.push(`Product "${product.name}": Image upload failed - ${uploadError.message}`);
+              setBulkImportProgress(((i + 1) / bulkProducts.length) * 100);
+              continue;
+            }
+
+            imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${fileName}`;
+          }
         }
 
         const res = await fetch("/api/products", {
@@ -1052,17 +1154,17 @@ export default function AdminPage() {
       <div className="min-h-screen bg-gray-900 text-white p-8">
         <h1 className="text-3xl font-bold mb-6">Admin Dashboard – Orders</h1>
         <div className="mb-6">
-          <label className="mr-2 font-semibold">Select view:</label>
+          <label className="mr-2 font-semibold text-white">Select view:</label>
           <select
             value={view}
             onChange={(e) => setView(e.target.value as AdminView)}
-            className="p-2 rounded text-black"
+            className="p-2 rounded text-white bg-gray-700 border border-gray-600"
           >
-            <option value="products">Products</option>
-            <option value="categories">Categories</option>
-            <option value="orders">Orders</option>
-            <option value="customers">Customers</option>
-            <option value="bulk-import">Bulk Import</option>
+            <option value="products" className="text-white bg-gray-700">Products</option>
+            <option value="categories" className="text-white bg-gray-700">Categories</option>
+            <option value="orders" className="text-white bg-gray-700">Orders</option>
+            <option value="customers" className="text-white bg-gray-700">Customers</option>
+            <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
           </select>
         </div>
 
@@ -1197,17 +1299,17 @@ export default function AdminPage() {
       <div className="min-h-screen bg-gray-900 text-white p-8">
         <h1 className="text-3xl font-bold mb-6">Admin Dashboard – Customers</h1>
         <div className="mb-6">
-          <label className="mr-2 font-semibold">Select view:</label>
+          <label className="mr-2 font-semibold text-white">Select view:</label>
           <select
             value={view}
             onChange={(e) => setView(e.target.value as AdminView)}
-            className="p-2 rounded text-black"
+            className="p-2 rounded text-white bg-gray-700 border border-gray-600"
           >
-            <option value="products">Products</option>
-            <option value="categories">Categories</option>
-            <option value="orders">Orders</option>
-            <option value="customers">Customers</option>
-            <option value="bulk-import">Bulk Import</option>
+            <option value="products" className="text-white bg-gray-700">Products</option>
+            <option value="categories" className="text-white bg-gray-700">Categories</option>
+            <option value="orders" className="text-white bg-gray-700">Orders</option>
+            <option value="customers" className="text-white bg-gray-700">Customers</option>
+            <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
           </select>
         </div>
 
@@ -1221,6 +1323,7 @@ export default function AdminPage() {
                 <tr>
                   <th className="text-left p-2">ID</th>
                   <th className="text-left p-2">Email</th>
+                  <th className="text-left p-2">Customer Name</th>
                   <th className="text-left p-2">Created</th>
                   <th className="text-left p-2">Last Updated</th>
                 </tr>
@@ -1230,6 +1333,7 @@ export default function AdminPage() {
                   <tr key={customer.id} className="border-t border-gray-700">
                     <td className="p-2 font-mono text-sm">{customer.id}</td>
                     <td className="p-2">{customer.email}</td>
+                    <td className="p-2">{customer.customer_name || 'N/A'}</td>
                     <td className="p-2">{new Date(customer.created_at).toLocaleString()}</td>
                     <td className="p-2">{new Date(customer.updated_at).toLocaleString()}</td>
                   </tr>
@@ -1253,17 +1357,17 @@ export default function AdminPage() {
       <div className="min-h-screen bg-gray-900 text-white p-8">
         <h1 className="text-3xl font-bold mb-6">Admin Dashboard – Bulk Import</h1>
         <div className="mb-6">
-          <label className="mr-2 font-semibold">Select view:</label>
+          <label className="mr-2 font-semibold text-white">Select view:</label>
           <select
             value={view}
             onChange={(e) => setView(e.target.value as AdminView)}
-            className="p-2 rounded text-black"
+            className="p-2 rounded text-white bg-gray-700 border border-gray-600"
           >
-            <option value="products">Products</option>
-            <option value="categories">Categories</option>
-            <option value="orders">Orders</option>
-            <option value="customers">Customers</option>
-            <option value="bulk-import">Bulk Import</option>
+            <option value="products" className="text-white bg-gray-700">Products</option>
+            <option value="categories" className="text-white bg-gray-700">Categories</option>
+            <option value="orders" className="text-white bg-gray-700">Orders</option>
+            <option value="customers" className="text-white bg-gray-700">Customers</option>
+            <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
           </select>
         </div>
 
@@ -1273,19 +1377,23 @@ export default function AdminPage() {
             <h2 className="text-xl font-bold mb-4">CSV Upload</h2>
             <div className="mb-4">
               <p className="text-gray-300 mb-2">Upload a CSV file with the following columns:</p>
-              <div className="bg-gray-700 p-3 rounded text-sm font-mono">
-                listing_number, name, price, retail, description, image, shipping_cost, weight_oz, stock, category_id, published, countdown
+              <div className="bg-gray-700 p-3 rounded text-sm font-mono text-white">
+                listing_number, name, category_id, description, image, price, retail, weight_oz, stock, countdown, published
               </div>
               <p className="text-gray-400 text-sm mt-2">
-                * Required: listing_number, name, price, retail, description<br/>
-                * published: true/false or 1/0<br/>
-                * countdown: ISO date string (optional)<br/>
-                * image: Leave blank or use URL - you can upload images individually in the form below
+                * Required: listing_number, name, price, retail<br/>
+                * Optional: description, image, category_id, weight_oz, stock, countdown, published<br/>
+                * category_id: Numeric ID of the category (leave blank if no category)<br/>
+                * weight_oz: Weight in total ounces (e.g., 1 lb 4 oz = 20 oz)<br/>
+                * stock: Quantity available (defaults to 0 if not provided)<br/>
+                * published: true/false or 1/0 (defaults to false)<br/>
+                * countdown: ISO date string (e.g., 2024-12-31T23:59:59Z) - optional<br/>
+                * image: Leave blank, use URL (will be automatically downloaded), or upload images individually in the form below
               </p>
               <button
                 onClick={() => {
-                  const headers = "listing_number,name,price,retail,description,image,shipping_cost,weight_oz,stock,category_id,published,countdown\n";
-                  const sample = "A001,Sample Product,19.99,39.99,A great product,https://example.com/image.jpg,5.00,16,10,1,true,2024-12-31T23:59:59Z\n";
+                  const headers = "listing_number,name,category_id,description,image,price,retail,weight_oz,stock,countdown,published\n";
+                  const sample = "A001,Sample Product,1,Optional product description,https://example.com/image.jpg,19.99,39.99,20,10,2024-12-31T23:59:59Z,true\n";
                   const csvContent = headers + sample;
                   const blob = new Blob([csvContent], { type: 'text/csv' });
                   const url = window.URL.createObjectURL(blob);
@@ -1522,6 +1630,11 @@ export default function AdminPage() {
                    
                    <div className="mt-3">
                      <label className="block text-sm font-medium mb-1">Product Image</label>
+                     <p className="text-xs text-gray-400 mb-2">
+                       {product.image && (product.image.startsWith('http://') || product.image.startsWith('https://')) 
+                         ? `✓ Image URL detected - will be automatically downloaded: ${product.image.substring(0, 60)}...`
+                         : 'Upload image file (optional if URL provided in CSV)'}
+                     </p>
                      <input
                        type="file"
                        accept="image/*"
@@ -1569,17 +1682,17 @@ export default function AdminPage() {
 
       {/* View selector */}
       <div className="mb-8">
-        <label className="mr-2 font-semibold">Select view:</label>
+        <label className="mr-2 font-semibold text-white">Select view:</label>
         <select
           value={view}
           onChange={(e) => setView(e.target.value as AdminView)}
-          className="p-2 rounded text-black"
+          className="p-2 rounded text-white bg-gray-700 border border-gray-600"
         >
-          <option value="products">Products</option>
-          <option value="categories">Categories</option>
-          <option value="orders">Orders</option>
-          <option value="customers">Customers</option>
-          <option value="bulk-import">Bulk Import</option>
+          <option value="products" className="text-white bg-gray-700">Products</option>
+          <option value="categories" className="text-white bg-gray-700">Categories</option>
+          <option value="orders" className="text-white bg-gray-700">Orders</option>
+          <option value="customers" className="text-white bg-gray-700">Customers</option>
+          <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
         </select>
       </div>
 
@@ -1688,7 +1801,7 @@ export default function AdminPage() {
           <label className="text-lg font-semibold mr-2">Storefront Go Live Time:</label>
           <input
             type="datetime-local"
-            className="p-2 rounded text-black"
+            className="p-2 rounded text-white bg-gray-700 border border-gray-600"
             value={utcToLocalInputValue(goLiveTime)}
             onChange={e => setGoLiveTime(localInputValueToUTC(e.target.value))}
             disabled={goLiveLoading}
@@ -1721,14 +1834,14 @@ export default function AdminPage() {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">Update Type:</label>
             <select
-              className="p-2 rounded text-black"
+              className="p-2 rounded text-white bg-gray-700 border border-gray-600"
               value={bulkPriceUpdateType}
               onChange={(e) => setBulkPriceUpdateType(e.target.value as 'percentage' | 'fixed' | 'set')}
               disabled={bulkPriceLoading}
             >
-              <option value="percentage">Percentage Change (%)</option>
-              <option value="fixed">Fixed Dollar Change ($)</option>
-              <option value="set">Set to Fixed Price ($)</option>
+              <option value="percentage" className="text-white bg-gray-700">Percentage Change (%)</option>
+              <option value="fixed" className="text-white bg-gray-700">Fixed Dollar Change ($)</option>
+              <option value="set" className="text-white bg-gray-700">Set to Fixed Price ($)</option>
             </select>
           </div>
           <div className="flex flex-col gap-2">
@@ -1806,75 +1919,109 @@ export default function AdminPage() {
       {/* Add Product Form */}
       {showAddForm ? (
         <form onSubmit={handleAddProduct} className="mb-8 bg-gray-800 p-4 rounded">
-          <h3 className="text-lg mb-2">Add New Product</h3>
-          <input type="text" placeholder="Listing Number" className="mb-2 p-1 w-full text-black" value={newProduct.listing_number || ""} onChange={e => setNewProduct({ ...newProduct, listing_number: e.target.value })} required />
-          <input type="text" placeholder="Name" className="mb-2 p-1 w-full text-black" value={newProduct.name} onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} required />
-          <select className="mb-2 p-1 w-full text-black" value={newProduct.category_id ?? ""} onChange={e => setNewProduct({ ...newProduct, category_id: e.target.value ? Number(e.target.value) : undefined })} required>
-            <option value="">Select Category</option>
+          <h3 className="text-lg mb-4 text-white">Add New Product</h3>
+          
+          {/* listing#/bin# */}
+          <input 
+            type="text" 
+            placeholder="listing#/bin#" 
+            className="mb-2 p-2 w-full text-white bg-gray-700 border border-gray-600 rounded placeholder-gray-400" 
+            value={newProduct.listing_number || ""} 
+            onChange={e => setNewProduct({ ...newProduct, listing_number: e.target.value })} 
+            required 
+          />
+          
+          {/* item name */}
+          <input 
+            type="text" 
+            placeholder="item name" 
+            className="mb-2 p-2 w-full text-white bg-gray-700 border border-gray-600 rounded placeholder-gray-400" 
+            value={newProduct.name} 
+            onChange={e => setNewProduct({ ...newProduct, name: e.target.value })} 
+            required 
+          />
+          
+          {/* select category */}
+          <select 
+            className="mb-2 p-2 w-full text-white bg-gray-700 border border-gray-600 rounded" 
+            value={newProduct.category_id ?? ""} 
+            onChange={e => setNewProduct({ ...newProduct, category_id: e.target.value ? Number(e.target.value) : undefined })} 
+            required
+          >
+            <option value="" className="text-gray-400">Select Category</option>
             {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
+              <option key={cat.id} value={cat.id} className="text-white">{cat.name}</option>
             ))}
           </select>
-          <textarea placeholder="Description" className="mb-2 p-1 w-full text-black" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} />
-          <input type="file" accept="image/*" multiple className="mb-2 p-1 w-full text-black" onChange={handleImageChange} />
-          {imageFiles.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {imageFiles.map((file, idx) => (
-                <Image key={idx} src={URL.createObjectURL(file)} alt={`Preview ${idx + 1}`} width={96} height={96} className="h-24" />
-              ))}
-            </div>
-          )}
-          <input type="text" placeholder="Image URL (optional)" className="mb-2 p-1 w-full text-black" value={newProduct.image} onChange={e => setNewProduct({ ...newProduct, image: e.target.value })} />
+          
+          {/* optional description */}
+          <textarea 
+            placeholder="optional description" 
+            className="mb-2 p-2 w-full text-white bg-gray-700 border border-gray-600 rounded placeholder-gray-400" 
+            value={newProduct.description} 
+            onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} 
+          />
+          
+          {/* choose image */}
+          <div className="mb-2">
+            <label className="block text-white mb-1">choose image</label>
+            <input 
+              type="file" 
+              accept="image/*" 
+              multiple 
+              className="p-2 w-full text-white bg-gray-700 border border-gray-600 rounded" 
+              onChange={handleImageChange} 
+            />
+            {imageFiles.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {imageFiles.map((file, idx) => (
+                  <Image key={idx} src={URL.createObjectURL(file)} alt={`Preview ${idx + 1}`} width={96} height={96} className="h-24 rounded" />
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* price */}
           <div className="mb-2 flex items-center">
-            <label className="mr-2 w-20">Price</label>
-            <span className="text-black bg-gray-200 px-2 py-1 rounded-l">$</span>
+            <label className="mr-2 w-20 text-white">Price</label>
+            <span className="text-white bg-gray-700 border border-gray-600 border-r-0 px-2 py-2 rounded-l">$</span>
             <input
               type="number"
               min="0"
               step="0.01"
               placeholder="0.00"
-              className="p-1 w-full text-black rounded-r"
+              className="p-2 w-full text-white bg-gray-700 border border-gray-600 rounded-r placeholder-gray-400"
               value={newProduct.price}
               onChange={e => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })}
               required
             />
           </div>
+          
+          {/* retail */}
           <div className="mb-2 flex items-center">
-            <label className="mr-2 w-20">Retail</label>
-            <span className="text-black bg-gray-200 px-2 py-1 rounded-l">$</span>
+            <label className="mr-2 w-20 text-white">Retail</label>
+            <span className="text-white bg-gray-700 border border-gray-600 border-r-0 px-2 py-2 rounded-l">$</span>
             <input
               type="number"
               min="0"
               step="0.01"
               placeholder="0.00"
-              className="p-1 w-full text-black rounded-r"
+              className="p-2 w-full text-white bg-gray-700 border border-gray-600 rounded-r placeholder-gray-400"
               value={newProduct.retail}
               onChange={e => setNewProduct({ ...newProduct, retail: parseFloat(e.target.value) || 0 })}
               required
             />
           </div>
-          <div className="mb-2 flex items-center">
-            <label className="mr-2 w-20">Shipping</label>
-            <span className="text-black bg-gray-200 px-2 py-1 rounded-l">$</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              className="p-1 w-full text-black rounded-r"
-              value={newProduct.shipping_cost}
-              onChange={e => setNewProduct({ ...newProduct, shipping_cost: parseFloat(e.target.value) || 0 })}
-              required
-            />
-          </div>
+          
+          {/* weight lbs oz */}
           <div className="mb-2 flex items-center gap-2">
-            <label className="mr-2 w-20">Weight</label>
+            <label className="mr-2 w-20 text-white">Weight</label>
             <input
               type="number"
               min="0"
               step="1"
               placeholder="lbs"
-              className="p-1 w-24 text-black rounded"
+              className="p-2 w-24 text-white bg-gray-700 border border-gray-600 rounded placeholder-gray-400"
               value={Math.floor(((newProduct.weight_oz ?? 0) / 16))}
               onChange={e => {
                 const lbs = parseInt(e.target.value) || 0;
@@ -1883,14 +2030,14 @@ export default function AdminPage() {
               }}
               required
             />
-            <span className="text-gray-300">lbs</span>
+            <span className="text-white">lbs</span>
             <input
               type="number"
               min="0"
               max="15.9"
               step="0.1"
               placeholder="oz"
-              className="p-1 w-24 text-black rounded"
+              className="p-2 w-24 text-white bg-gray-700 border border-gray-600 rounded placeholder-gray-400"
               value={(((newProduct.weight_oz ?? 0) % 16).toFixed(1))}
               onChange={e => {
                 const oz = parseFloat(e.target.value) || 0;
@@ -1899,29 +2046,103 @@ export default function AdminPage() {
               }}
               required
             />
-            <span className="text-gray-300">oz</span>
+            <span className="text-white">oz</span>
           </div>
-          <input type="number" placeholder="Stock" className="mb-2 p-1 w-full text-black" value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) || 0 })} required />
-          <input type="datetime-local" className="mb-2 p-1 w-full text-black" value={new Date(newProduct.countdown).toISOString().slice(0,16)} onChange={e => setNewProduct({ ...newProduct, countdown: new Date(e.target.value) })} required />
-          <input type="checkbox" className="mb-2 mr-2" checked={newProduct.published} onChange={e => setNewProduct({ ...newProduct, published: e.target.checked })} />
-          <label className="mr-4">Published</label>
-          <div>
-            <button type="submit" className="bg-green-600 px-4 py-2 rounded mr-2">Add</button>
-            <button type="button" className="bg-gray-600 px-4 py-2 rounded" onClick={() => setShowAddForm(false)}>Cancel</button>
+          
+          {/* quantity */}
+          <input 
+            type="number" 
+            placeholder="quantity" 
+            className="mb-2 p-2 w-full text-white bg-gray-700 border border-gray-600 rounded placeholder-gray-400" 
+            value={newProduct.stock} 
+            onChange={e => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) || 0 })} 
+            required 
+          />
+          
+          {/* date and time added */}
+          <div className="mb-2">
+            <label className="block text-white mb-1">date and time added</label>
+            <input 
+              type="datetime-local" 
+              className="p-2 w-full text-white bg-gray-700 border border-gray-600 rounded" 
+              value={new Date(newProduct.countdown).toISOString().slice(0,16)} 
+              onChange={e => setNewProduct({ ...newProduct, countdown: new Date(e.target.value) })} 
+              required 
+            />
+          </div>
+          
+          {/* published checkbox */}
+          <div className="mb-4 flex items-center">
+            <input 
+              type="checkbox" 
+              className="mr-2" 
+              checked={newProduct.published} 
+              onChange={e => setNewProduct({ ...newProduct, published: e.target.checked })} 
+            />
+            <label className="text-white">Published</label>
+          </div>
+          
+          {/* buttons */}
+          <div className="flex gap-2">
+            <button 
+              type="submit" 
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+              disabled={loading}
+            >
+              {loading ? 'Adding...' : 'Add'}
+            </button>
+            <button 
+              type="button" 
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded" 
+              onClick={() => setShowAddForm(false)}
+            >
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+              onClick={async () => {
+                setLoading(true);
+                const res = await fetch('/api/products/publish-all', { method: 'POST' });
+                if (res.ok) {
+                  const updated = await res.json();
+                  setProductList(updated);
+                }
+                setLoading(false);
+              }}
+              disabled={loading}
+            >
+              {loading ? 'Publishing...' : 'Publish All'}
+            </button>
           </div>
         </form>
       ) : (
-        <button className="bg-green-600 px-4 py-2 rounded mb-8" onClick={() => setShowAddForm(true)}>Add New Product</button>
+        <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded mb-8" onClick={() => setShowAddForm(true)}>Add New Product</button>
       )}
       {/* Edit Product Form */}
       {editingProduct && (
         <form onSubmit={handleEditProduct} className="mb-8 bg-gray-800 p-4 rounded">
           <h3 className="text-lg mb-2">Edit Product</h3>
-          <input type="text" placeholder="Name" className="mb-2 p-1 w-full text-black" value={editingProduct?.name || ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, name: e.target.value })} required />
-          <input type="text" placeholder="Image URL" className="mb-2 p-1 w-full text-black" value={editingProduct?.image || ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, image: e.target.value })} required />
-          <input type="number" placeholder="Price" className="mb-2 p-1 w-full text-black" value={editingProduct?.price ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })} required />
-          <input type="number" placeholder="Retail" className="mb-2 p-1 w-full text-black" value={editingProduct?.retail ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, retail: parseFloat(e.target.value) || 0 })} required />
-          <input type="number" placeholder="Shipping" className="mb-2 p-1 w-full text-black" value={editingProduct?.shipping_cost ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, shipping_cost: parseFloat(e.target.value) || 0 })} required />
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Product Name</label>
+            <input type="text" placeholder="Name" className="p-1 w-full text-black" value={editingProduct?.name || ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, name: e.target.value })} required />
+          </div>
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Image URL</label>
+            <input type="text" placeholder="Image URL" className="p-1 w-full text-black" value={editingProduct?.image || ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, image: e.target.value })} required />
+          </div>
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Sell Price</label>
+            <input type="number" placeholder="Sell Price" className="p-1 w-full text-black" value={editingProduct?.price ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })} required />
+          </div>
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Retail Price</label>
+            <input type="number" placeholder="Retail Price" className="p-1 w-full text-black" value={editingProduct?.retail ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, retail: parseFloat(e.target.value) || 0 })} required />
+          </div>
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Shipping Cost</label>
+            <input type="number" placeholder="Shipping Cost" className="p-1 w-full text-black" value={editingProduct?.shipping_cost ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, shipping_cost: parseFloat(e.target.value) || 0 })} required />
+          </div>
           <div className="mb-2 flex items-center gap-2">
             <label className="mr-2 w-20">Weight</label>
             <input
@@ -1958,25 +2179,39 @@ export default function AdminPage() {
             />
             <span className="text-gray-300">oz</span>
           </div>
-          <input type="number" placeholder="Stock Quantity" className="mb-2 p-1 w-full text-black" value={editingProduct?.stock ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })} required />
-          <input type="datetime-local" className="mb-2 p-1 w-full text-black" value={editingProduct ? new Date(editingProduct.countdown).toISOString().slice(0,16) : ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, countdown: new Date(e.target.value) })} required />
-          <input type="checkbox" className="mb-2 mr-2" checked={editingProduct?.published || false} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, published: e.target.checked })} />
-          <label className="mr-4">Published</label>
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Stock Quantity</label>
+            <input type="number" placeholder="Stock Quantity" className="p-1 w-full text-black" value={editingProduct?.stock ?? 0} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })} required />
+          </div>
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Countdown End Date/Time</label>
+            <input type="datetime-local" className="p-1 w-full text-black" value={editingProduct ? new Date(editingProduct.countdown).toISOString().slice(0,16) : ""} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, countdown: new Date(e.target.value) })} required />
+          </div>
+          <div className="mb-2 flex items-center">
+            <input type="checkbox" className="mr-2" checked={editingProduct?.published || false} onChange={e => editingProduct && setEditingProduct({ ...editingProduct, published: e.target.checked })} />
+            <label className="text-sm font-medium text-gray-300">Published</label>
+          </div>
           <div>
             <button type="submit" className="bg-yellow-600 px-4 py-2 rounded mr-2">Save</button>
             <button type="button" className="bg-gray-600 px-4 py-2 rounded" onClick={() => setEditingProduct(null)}>Cancel</button>
           </div>
         </form>
       )}
-      <button className="bg-blue-600 px-4 py-2 rounded mb-4" onClick={async () => {
-        setLoading(true);
-        const res = await fetch('/api/products/publish-all', { method: 'POST' });
-        if (res.ok) {
-          const updated = await res.json();
-          setProductList(updated);
-        }
-        setLoading(false);
-      }}>Publish All</button>
+      <button 
+        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded mb-4" 
+        onClick={async () => {
+          setLoading(true);
+          const res = await fetch('/api/products/publish-all', { method: 'POST' });
+          if (res.ok) {
+            const updated = await res.json();
+            setProductList(updated);
+          }
+          setLoading(false);
+        }}
+        disabled={loading}
+      >
+        {loading ? 'Publishing...' : 'Publish All'}
+      </button>
     </div>
   );
 }
