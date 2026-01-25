@@ -30,7 +30,7 @@ export async function GET() {
     // 3. Most recent shipping address name
     const userEmails = customers.map(c => c.email).filter(Boolean);
     
-    let nameMap = new Map<string, string | null>();
+    const nameMap = new Map<string, string | null>();
     if (userEmails.length > 0) {
       // Priority 1: Get name from most recent order's address_to field (from cart form)
       const { data: orders } = await supabase
