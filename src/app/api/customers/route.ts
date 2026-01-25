@@ -40,9 +40,10 @@ export async function GET() {
         .not('address_to', 'is', null)
         .order('created_at', { ascending: false });
 
-      if (orders) {
+      if (orders && orders.length > 0) {
         // Group orders by email and get the most recent one for each
-        const ordersByEmail = new Map<string, typeof orders[0]>();
+        type OrderType = { user_email: string | null; address_to: any; created_at: string };
+        const ordersByEmail = new Map<string, OrderType>();
         orders.forEach(order => {
           if (order.user_email && !ordersByEmail.has(order.user_email)) {
             ordersByEmail.set(order.user_email, order);
