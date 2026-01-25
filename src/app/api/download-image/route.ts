@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
         'Accept': 'image/*',
         'Referer': imageUrl,
       },
-      // @ts-expect-error - Next.js fetch supports timeout in some environments
       signal: AbortSignal.timeout(15000), // 15 second timeout
     });
 
