@@ -7,11 +7,11 @@ CREATE POLICY "Anyone can read published products" ON public.products
 
 -- Policy: Service role can manage all products (for admin operations)
 CREATE POLICY "Service role can manage all products" ON public.products
-    FOR ALL USING (auth.role() = 'service_role');
+    FOR ALL USING ((SELECT auth.role()) = 'service_role');
 
 -- Policy: Allow authenticated users to read all products (for admin interface)
 CREATE POLICY "Authenticated users can read all products" ON public.products
-    FOR SELECT USING (auth.role() = 'authenticated');
+    FOR SELECT USING ((SELECT auth.role()) = 'authenticated');
 
 -- Add comment to document the security model
 COMMENT ON TABLE public.products IS 'E-commerce products table with RLS enabled. Published products are publicly readable, all products readable by authenticated users, and only service role can modify.';

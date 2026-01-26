@@ -75,7 +75,7 @@ function CheckoutFormContent({ onSuccess, onError }: Omit<CheckoutFormProps, 'cl
         {isProcessing ? 'Processing...' : 'Pay Now'}
       </button>
       {message && (
-        <div className="text-center text-sm">
+        <div className="text-center text-sm text-white">
           {message}
         </div>
       )}
@@ -87,7 +87,37 @@ export default function CheckoutForm({ clientSecret, customerSessionClientSecret
   const options: any = { 
     clientSecret,
     appearance: {
-      theme: 'stripe',
+      theme: 'night',
+      variables: {
+        colorPrimary: '#3b82f6',
+        colorBackground: '#1f2937',
+        colorText: '#ffffff',
+        colorDanger: '#ef4444',
+        fontFamily: 'system-ui, sans-serif',
+        spacingUnit: '4px',
+        borderRadius: '6px',
+      },
+      rules: {
+        '.Input': {
+          backgroundColor: '#374151',
+          color: '#ffffff',
+          borderColor: '#4b5563',
+        },
+        '.Input:focus': {
+          borderColor: '#3b82f6',
+        },
+        '.Label': {
+          color: '#ffffff',
+        },
+        '.Tab': {
+          backgroundColor: '#374151',
+          color: '#d1d5db',
+        },
+        '.Tab--selected': {
+          backgroundColor: '#1f2937',
+          color: '#ffffff',
+        },
+      },
     },
     locale: 'en'
   };

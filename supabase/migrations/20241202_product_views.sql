@@ -26,12 +26,16 @@ CREATE POLICY "Service role can manage all product views" ON product_views
 
 -- Function to clean up old views (older than 10 minutes)
 CREATE OR REPLACE FUNCTION cleanup_old_product_views()
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   DELETE FROM product_views 
   WHERE last_seen < NOW() - INTERVAL '10 minutes';
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Add comment to document the table
 COMMENT ON TABLE product_views IS 'Tracks active viewers per product for social proof. Sessions older than 10 minutes are automatically cleaned up.';

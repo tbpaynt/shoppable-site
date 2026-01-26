@@ -348,31 +348,31 @@ export default function CartPage() {
 
   if (showCheckout && clientSecret) {
     return (
-      <div className="max-w-2xl mx-auto p-8 bg-white rounded shadow text-gray-900">
-        <h1 className="text-2xl font-bold mb-6">Complete Your Purchase</h1>
+      <div className="max-w-2xl mx-auto p-8 bg-gray-800 rounded shadow text-white">
+        <h1 className="text-2xl font-bold mb-6 text-white">Complete Your Purchase</h1>
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">Order Summary</h2>
+          <h2 className="text-lg font-semibold mb-2 text-white">Order Summary</h2>
           <div className="space-y-2">
             {cart.map(item => (
-              <div key={item.id} className="flex justify-between">
+              <div key={item.id} className="flex justify-between text-white">
                 <span>{item.name} x {item.quantity}</span>
                 <span>${(item.price * item.quantity).toFixed(2)}</span>
               </div>
             ))}
-            <div className="border-t pt-2 font-bold space-y-1">
-              <div className="flex justify-between text-sm font-normal">
+            <div className="border-t border-gray-600 pt-2 font-bold space-y-1">
+              <div className="flex justify-between text-sm font-normal text-white">
                 <span>Items Subtotal</span>
                 <span>${productTotal.toFixed(2)}</span>
               </div>
               
               {/* Free Shipping Progress */}
               {!isEligibleForFreeShipping && amountNeededForFreeShipping > 0 && (
-                <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded text-sm">
+                <div className="bg-green-900 border border-green-600 text-green-300 px-3 py-2 rounded text-sm">
                   <div className="flex justify-between items-center">
                     <span>Add ${amountNeededForFreeShipping.toFixed(2)} more for FREE shipping!</span>
                     <span className="text-xs">({((productTotal / FREE_SHIPPING_THRESHOLD) * 100).toFixed(0)}% there)</span>
                   </div>
-                  <div className="w-full bg-green-200 rounded-full h-2 mt-1">
+                  <div className="w-full bg-green-800 rounded-full h-2 mt-1">
                     <div 
                       className="bg-green-500 h-2 rounded-full transition-all duration-300" 
                       style={{ width: `${Math.min((productTotal / FREE_SHIPPING_THRESHOLD) * 100, 100)}%` }}
@@ -382,20 +382,20 @@ export default function CartPage() {
               )}
               
               {isEligibleForFreeShipping && (
-                <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded text-sm">
+                <div className="bg-green-900 border border-green-600 text-green-300 px-3 py-2 rounded text-sm">
                   🎉 You qualify for FREE shipping!
                 </div>
               )}
               
-              <div className="flex justify-between text-sm font-normal">
+              <div className="flex justify-between text-sm font-normal text-white">
                 <span>Shipping</span>
                 <span>{isEligibleForFreeShipping ? 'FREE' : `$${shippingTotal.toFixed(2)}`}</span>
               </div>
-              <div className="flex justify-between text-sm font-normal">
+              <div className="flex justify-between text-sm font-normal text-white">
                 <span>Tax (6%)</span>
                 <span>${taxTotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-lg">
+              <div className="flex justify-between text-lg text-white">
                 <span>Total:</span>
                 <span>${total.toFixed(2)}</span>
               </div>
@@ -410,15 +410,15 @@ export default function CartPage() {
             const displayAddress = formAddress || savedAddress;
             
             return displayAddress ? (
-              <div className="mb-6 border-t pt-4">
-                <h2 className="text-lg font-semibold mb-2">Shipping Address</h2>
-                <div className="text-sm text-gray-700 space-y-1">
+              <div className="mb-6 border-t border-gray-600 pt-4">
+                <h2 className="text-lg font-semibold mb-2 text-white">Shipping Address</h2>
+                <div className="text-sm text-gray-300 space-y-1">
                   <div className="font-medium">{displayAddress.name}</div>
                   <div>{displayAddress.street1}</div>
                   {displayAddress.street2 && <div>{displayAddress.street2}</div>}
                   <div>{displayAddress.city}, {displayAddress.state} {displayAddress.zip}</div>
                   {!formAddress && savedAddress && (
-                    <div className="text-xs text-gray-500 mt-2 italic">Using your saved default address</div>
+                    <div className="text-xs text-gray-400 mt-2 italic">Using your saved default address</div>
                   )}
                 </div>
               </div>
@@ -438,7 +438,7 @@ export default function CartPage() {
             setCustomerSessionClientSecret(null);
             setError(null);
           }}
-          className="mt-4 w-full bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600"
+          className="mt-4 w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700"
         >
           Back to Cart
         </button>
@@ -460,8 +460,8 @@ export default function CartPage() {
           <div className="mb-6">
             {/* Saved Addresses Selector */}
             {savedAddresses.length > 0 && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="mb-4 p-3 bg-gray-800 border border-gray-600 rounded">
+                <label className="block text-sm font-medium text-white mb-2">
                   Use Saved Address:
                 </label>
                 <select
@@ -480,18 +480,18 @@ export default function CartPage() {
                       }
                     }
                   }}
-                  className="w-full p-2 border rounded text-black mb-2"
+                  className="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white mb-2"
                   defaultValue=""
                 >
-                  <option value="">Select a saved address...</option>
+                  <option value="" className="text-white bg-gray-700">Select a saved address...</option>
                   {savedAddresses.map((addr: any) => (
-                    <option key={addr.id} value={addr.id}>
+                    <option key={addr.id} value={addr.id} className="text-white bg-gray-700">
                       {addr.name} - {addr.street1}, {addr.city}, {addr.state} {addr.zip}
                       {addr.is_default ? " (Default)" : ""}
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-300">
                   Or enter a new address below. If you proceed without entering an address, your default saved address will be used.
                 </p>
               </div>
@@ -503,35 +503,35 @@ export default function CartPage() {
                 placeholder="Recipient Name"
                 value={address.name}
                 onChange={(e) => setAddress({ ...address, name: e.target.value })}
-                className="p-2 border rounded text-black col-span-1 md:col-span-2"
+                className="p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400 col-span-1 md:col-span-2"
               />
             <input
               type="text"
               placeholder="Street Address"
               value={address.street1}
               onChange={(e) => setAddress({ ...address, street1: e.target.value })}
-              className="p-2 border rounded text-black"
+              className="p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
             />
             <input
               type="text"
               placeholder="City"
               value={address.city}
               onChange={(e) => setAddress({ ...address, city: e.target.value })}
-              className="p-2 border rounded text-black"
+              className="p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
             />
             <input
               type="text"
               placeholder="State (e.g. WV)"
               value={address.state}
               onChange={(e) => setAddress({ ...address, state: e.target.value.toUpperCase() })}
-              className="p-2 border rounded text-black"
+              className="p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
             />
             <input
               type="text"
               placeholder="ZIP"
               value={address.zip}
               onChange={(e) => setAddress({ ...address, zip: e.target.value })}
-              className="p-2 border rounded text-black"
+              className="p-2 border border-gray-600 rounded bg-gray-700 text-white placeholder-gray-400"
             />
             {quoteLoading && <span className="text-gray-600 text-sm col-span-1 md:col-span-2">Calculating shipping…</span>}
             {quoteError && <span className="text-red-600 text-sm col-span-1 md:col-span-2">{quoteError}</span>}
@@ -636,7 +636,7 @@ export default function CartPage() {
                             e.currentTarget.blur();
                           }
                         }}
-                        className="w-16 p-1 border rounded text-black"
+                        className="w-16 p-1 border border-gray-600 rounded bg-gray-700 text-white"
                       />
                       {item.stock && (
                         <span className="text-xs text-gray-600 mt-1">

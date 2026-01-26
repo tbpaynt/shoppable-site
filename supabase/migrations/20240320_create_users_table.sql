@@ -16,11 +16,11 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 -- Create policy to allow users to read their own data
 CREATE POLICY "Users can read their own data" ON public.users
-    FOR SELECT USING (auth.uid() = id);
+    FOR SELECT USING ((SELECT auth.uid()) = id);
 
 -- Create policy to allow users to update their own data
 CREATE POLICY "Users can update their own data" ON public.users
-    FOR UPDATE USING (auth.uid() = id);
+    FOR UPDATE USING ((SELECT auth.uid()) = id);
 
 -- Create policy to allow inserting new users (for signup)
 CREATE POLICY "Allow user creation" ON public.users
