@@ -2,6 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: __dirname,
+  webpack: (config) => {
+    // Suppress "Critical dependency: the request of a dependency is an expression"
+    // from @supabase/realtime-js (known upstream issue, does not affect runtime)
+    config.ignoreWarnings = [
+      { module: /node_modules\/@supabase\/realtime-js/ },
+      { module: /node-gyp-build/ },
+      { message: /Critical dependency: the request of a dependency is an expression/ },
+    ];
+    return config;
+  },
   images: {
     remotePatterns: [
       {
