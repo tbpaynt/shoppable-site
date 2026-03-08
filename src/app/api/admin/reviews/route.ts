@@ -20,6 +20,7 @@ export async function GET() {
         created_at,
         is_verified_purchase,
         is_approved,
+        reviewer_name,
         products:product_id (
           name
         ),

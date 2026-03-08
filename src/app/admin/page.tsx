@@ -122,8 +122,22 @@ export default function AdminPage() {
   const [customersLoading, setCustomersLoading] = useState(false);
 
   // Reviews state
-
-
+  type AdminReview = {
+    id: string;
+    product_id: number | null;
+    user_id: string;
+    rating: number;
+    title: string | null;
+    comment: string | null;
+    created_at: string;
+    is_verified_purchase: boolean;
+    is_approved: boolean;
+    reviewer_name: string | null;
+    products: { name: string } | null;
+    users: { email: string } | null;
+  };
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Login form state for admin authentication
   const [email, setEmail] = useState('');
@@ -453,7 +467,48 @@ export default function AdminPage() {
     fetchCustomers();
   }, [view]);
 
+  // Fetch reviews when Reviews view is selected
+  useEffect(() => {
+    if (view !== 'reviews') return;
+    const fetchReviews = async () => {
+      setReviewsLoading(true);
+      try {
+        const res = await fetch('/api/admin/reviews');
+        const data = await res.json();
+        setReviews(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error('Error fetching reviews', e);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+    fetchReviews();
+  }, [view]);
 
+  const handleReviewApproval = async (reviewId: string, isApproved: boolean) => {
+    try {
+      const res = await fetch('/api/admin/reviews', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewId, isApproved }),
+      });
+      if (!res.ok) return;
+      setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, is_approved: isApproved } : r));
+    } catch (e) {
+      console.error('Error updating review', e);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Delete this review permanently?')) return;
+    try {
+      const res = await fetch(`/api/admin/reviews?id=${reviewId}`, { method: 'DELETE' });
+      if (!res.ok) return;
+      setReviews(prev => prev.filter(r => r.id !== reviewId));
+    } catch (e) {
+      console.error('Error deleting review', e);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -1164,6 +1219,7 @@ export default function AdminPage() {
             <option value="categories" className="text-white bg-gray-700">Categories</option>
             <option value="orders" className="text-white bg-gray-700">Orders</option>
             <option value="customers" className="text-white bg-gray-700">Customers</option>
+            <option value="reviews" className="text-white bg-gray-700">Reviews</option>
             <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
           </select>
         </div>
@@ -1309,6 +1365,7 @@ export default function AdminPage() {
             <option value="categories" className="text-white bg-gray-700">Categories</option>
             <option value="orders" className="text-white bg-gray-700">Orders</option>
             <option value="customers" className="text-white bg-gray-700">Customers</option>
+            <option value="reviews" className="text-white bg-gray-700">Reviews</option>
             <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
           </select>
         </div>
@@ -1367,6 +1424,7 @@ export default function AdminPage() {
             <option value="categories" className="text-white bg-gray-700">Categories</option>
             <option value="orders" className="text-white bg-gray-700">Orders</option>
             <option value="customers" className="text-white bg-gray-700">Customers</option>
+            <option value="reviews" className="text-white bg-gray-700">Reviews</option>
             <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
           </select>
         </div>
@@ -1692,9 +1750,86 @@ export default function AdminPage() {
           <option value="categories" className="text-white bg-gray-700">Categories</option>
           <option value="orders" className="text-white bg-gray-700">Orders</option>
           <option value="customers" className="text-white bg-gray-700">Customers</option>
+          <option value="reviews" className="text-white bg-gray-700">Reviews</option>
           <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
         </select>
       </div>
+
+      {/* REVIEWS MANAGEMENT */}
+      {view === 'reviews' && (
+        <>
+          <h2 className="text-xl mb-4">Customer Reviews</h2>
+          {reviewsLoading ? (
+            <div className="text-gray-400">Loading reviews...</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border border-gray-700 rounded">
+                <thead>
+                  <tr className="bg-gray-800 text-left">
+                    <th className="p-2 border-b border-gray-600">Product / Title</th>
+                    <th className="p-2 border-b border-gray-600">Reviewer</th>
+                    <th className="p-2 border-b border-gray-600">Rating</th>
+                    <th className="p-2 border-b border-gray-600">Comment</th>
+                    <th className="p-2 border-b border-gray-600">Date</th>
+                    <th className="p-2 border-b border-gray-600">Approved</th>
+                    <th className="p-2 border-b border-gray-600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviews.length === 0 ? (
+                    <tr><td colSpan={7} className="p-4 text-gray-400 text-center">No reviews yet.</td></tr>
+                  ) : (
+                    reviews.map((review) => (
+                      <tr key={review.id} className="border-t border-gray-700">
+                        <td className="p-2 text-gray-200">
+                          {review.products?.name || review.title || 'General review'}
+                        </td>
+                        <td className="p-2 text-gray-200">
+                          {review.reviewer_name || (review.users as { email?: string })?.email || '—'}
+                        </td>
+                        <td className="p-2">{review.rating}/5</td>
+                        <td className="p-2 text-gray-300 max-w-xs truncate">{review.comment || '—'}</td>
+                        <td className="p-2 text-gray-400 text-sm">{new Date(review.created_at).toLocaleString()}</td>
+                        <td className="p-2">
+                          <span className={`px-2 py-1 rounded text-sm ${review.is_approved ? 'bg-green-900 text-green-200' : 'bg-yellow-900 text-yellow-200'}`}>
+                            {review.is_approved ? 'Yes' : 'Pending'}
+                          </span>
+                        </td>
+                        <td className="p-2 flex flex-wrap gap-1">
+                          {!review.is_approved ? (
+                            <button
+                              type="button"
+                              onClick={() => handleReviewApproval(review.id, true)}
+                              className="bg-green-600 text-white px-2 py-1 rounded text-sm hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleReviewApproval(review.id, false)}
+                              className="bg-yellow-600 text-white px-2 py-1 rounded text-sm hover:bg-yellow-700"
+                            >
+                              Unapprove
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReview(review.id)}
+                            className="bg-red-600 text-white px-2 py-1 rounded text-sm hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
 
       {/* PRODUCT MANAGEMENT */}
       {view === 'products' && (

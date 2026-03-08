@@ -12,11 +12,20 @@ const supabase = createClient(
 
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+const COMBINE_ORDERS_WINDOW_MINUTES = 30;
+
 interface OrderItem {
   id: number;
   name: string;
   quantity: number;
   price: number;
+}
+
+/** Normalize address for comparison (same customer, same address = combinable) */
+function normalizeAddressKey(addr: { street1?: string; city?: string; state?: string; zip?: string } | null): string {
+  if (!addr) return '';
+  const s = (v: string | undefined) => String(v ?? '').trim().toLowerCase();
+  return [s(addr.street1), s(addr.city), s(addr.state), s(addr.zip)].join('|');
 }
 
 export async function POST(request: NextRequest) {
@@ -166,61 +175,140 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     }
   }
 
-  // Create Shippo order so it shows up in Shippo dashboard
-  console.log('🔥 WEBHOOK: About to create Shippo order, address_to:', address_to);
+  // Create Shippo order (single or combined with other recent orders to same address)
+  const parsedAddress = address_to ? JSON.parse(address_to) as { name?: string; street1: string; city: string; state: string; zip: string; country?: string } : null;
   try {
-    if (address_to) {
-      console.log('🔥 WEBHOOK: Creating Shippo order...');
-      const parsedAddress = JSON.parse(address_to);
-      console.log('🔥 WEBHOOK: Parsed address:', parsedAddress);
-      
-      const lineItems = orderItems.map((item) => {
-        const prodInfo = productMap.get(item.id);
-        const weight = prodInfo?.weight_oz ?? 4; // Default to 4 oz if no weight specified
-        const lineItem = {
-          title: item.name,
-          quantity: item.quantity,
-          total_price: (item.price * item.quantity).toFixed(2), // Fix: multiply by quantity
-          currency: 'USD',
-          weight: weight,
-          weight_unit: 'oz',
-        };
-        console.log('🔥 WEBHOOK: Line item:', lineItem);
-        return lineItem;
+    if (!parsedAddress) {
+      console.log('❌ WEBHOOK: No address_to provided, skipping Shippo order creation');
+    } else {
+      const addressKey = normalizeAddressKey(parsedAddress);
+      const thirtyMinutesAgo = new Date(Date.now() - COMBINE_ORDERS_WINDOW_MINUTES * 60 * 1000).toISOString();
+
+      // Find paid orders for this customer with no Shippo order yet, within the time window
+      const { data: candidateOrders, error: fetchErr } = await supabase
+        .from('orders')
+        .select('id, address_to, total_amount, ship_cost, tax_amount')
+        .eq('user_email', userEmail)
+        .eq('status', 'paid')
+        .is('shippo_order_id', null)
+        .gte('created_at', thirtyMinutesAgo);
+
+      if (fetchErr) {
+        console.error('Error fetching combinable orders:', fetchErr);
+        throw fetchErr;
+      }
+
+      // Same address only: compare normalized street/city/state/zip
+      const combinableOrders = (candidateOrders || []).filter((o) => {
+        const addr = typeof o.address_to === 'string' ? JSON.parse(o.address_to) : o.address_to;
+        return normalizeAddressKey(addr) === addressKey;
       });
 
-      console.log('🔥 WEBHOOK: About to call createShippoOrder with:', {
-        orderNumber: orderId.toString(),
-        addressTo: parsedAddress,
-        lineItemsCount: lineItems.length,
-        totalPrice: paymentIntent.amount / 100,
-        shippingCost: ship_cost ? Number(ship_cost) : undefined,
-        taxAmount: tax_amount ? Number(tax_amount) : undefined,
-      });
+      const orderIds = combinableOrders.map((o: { id: string }) => o.id);
+      const isCombined = orderIds.length > 1;
+
+      let lineItems: { title: string; quantity: number; total_price: string; currency: string; weight: number; weight_unit: string }[];
+      let totalPrice: number;
+      let totalShipCost: number | undefined;
+      let totalTaxAmount: number | undefined;
+
+      if (isCombined) {
+        // Fetch all order_items for combinable orders
+        const { data: allItems, error: itemsErr } = await supabase
+          .from('order_items')
+          .select('order_id, product_id, name, price, quantity')
+          .in('order_id', orderIds);
+
+        if (itemsErr || !allItems?.length) {
+          console.error('Error fetching order items for combined order:', itemsErr);
+          throw new Error('Failed to fetch order items for combined shipment');
+        }
+
+        const productIds = [...new Set(allItems.map((i: { product_id: number }) => i.product_id))];
+        const { data: combinedProducts } = await supabase
+          .from('products')
+          .select('id, weight_oz')
+          .in('id', productIds);
+        const weightMap = new Map<number, number>();
+        (combinedProducts || []).forEach((p: { id: number; weight_oz: number | null }) => weightMap.set(p.id, p.weight_oz ?? 4));
+
+        // Aggregate by product_id: same product from multiple orders -> one line
+        const byProduct = new Map<number, { name: string; quantity: number; totalPrice: number; weight: number }>();
+        for (const row of allItems as { product_id: number; name: string; price: number; quantity: number }[]) {
+          const existing = byProduct.get(row.product_id);
+          const qty = row.quantity;
+          const lineTotal = row.price * qty;
+          const weight = weightMap.get(row.product_id) ?? 4;
+          if (existing) {
+            existing.quantity += qty;
+            existing.totalPrice += lineTotal;
+          } else {
+            byProduct.set(row.product_id, { name: row.name, quantity: qty, totalPrice: lineTotal, weight });
+          }
+        }
+
+        lineItems = Array.from(byProduct.entries()).map(([, v]) => ({
+          title: v.name,
+          quantity: v.quantity,
+          total_price: v.totalPrice.toFixed(2),
+          currency: 'USD',
+          weight: v.weight,
+          weight_unit: 'oz',
+        }));
+
+        totalPrice = combinableOrders.reduce((sum: number, o: { total_amount?: number }) => sum + (Number(o.total_amount) || 0), 0);
+        totalShipCost = combinableOrders.reduce((sum: number, o: { ship_cost?: number | null }) => sum + (Number(o.ship_cost) || 0), 0) || undefined;
+        totalTaxAmount = combinableOrders.reduce((sum: number, o: { tax_amount?: number | null }) => sum + (Number(o.tax_amount) || 0), 0) || undefined;
+
+        console.log('🔥 WEBHOOK: Combining', orderIds.length, 'orders into one Shippo order:', orderIds);
+      } else {
+        // Single order: use current payment data
+        lineItems = orderItems.map((item) => {
+          const weight = productMap.get(item.id)?.weight_oz ?? 4;
+          return {
+            title: item.name,
+            quantity: item.quantity,
+            total_price: (item.price * item.quantity).toFixed(2),
+            currency: 'USD',
+            weight: weight,
+            weight_unit: 'oz',
+          };
+        });
+        totalPrice = paymentIntent.amount / 100;
+        totalShipCost = ship_cost ? Number(ship_cost) : undefined;
+        totalTaxAmount = tax_amount ? Number(tax_amount) : undefined;
+      }
+
+      const orderNumber = isCombined ? `combined-${orderIds.join('-')}` : orderId.toString();
+      console.log('🔥 WEBHOOK: Creating Shippo order:', { orderNumber, lineItemsCount: lineItems.length, totalPrice, orderIds });
 
       const shippoResult = await createShippoOrder({
-        orderNumber: orderId.toString(),
+        orderNumber,
         addressTo: parsedAddress,
         lineItems,
-        totalPrice: paymentIntent.amount / 100,
-        shippingCost: ship_cost ? Number(ship_cost) : undefined,
-        taxAmount: tax_amount ? Number(tax_amount) : undefined,
+        totalPrice,
+        shippingCost: totalShipCost,
+        taxAmount: totalTaxAmount,
       });
-      
-      console.log('✅ Shippo order created successfully:', shippoResult?.object_id || 'created');
-      console.log('✅ Full Shippo result:', JSON.stringify(shippoResult, null, 2));
-    } else {
-      console.log('❌ WEBHOOK: No address_to provided, skipping Shippo order creation');
+
+      const shippoOrderId = (shippoResult as { object_id?: string })?.object_id;
+      if (shippoOrderId) {
+        const { error: updateErr } = await supabase
+          .from('orders')
+          .update({ shippo_order_id: shippoOrderId })
+          .in('id', orderIds);
+        if (updateErr) {
+          console.error('Failed to set shippo_order_id on orders:', updateErr);
+        } else {
+          console.log('✅ Set shippo_order_id on orders:', orderIds.length, orderIds);
+        }
+      }
+
+      console.log('✅ Shippo order created:', shippoOrderId || 'created', isCombined ? '(combined)' : '');
     }
   } catch (e) {
-    console.error('❌ Failed to create Shippo order - Full error:', e);
-    console.error('❌ Error message:', (e as Error)?.message);
-    console.error('❌ Error stack:', (e as Error)?.stack);
+    console.error('❌ Failed to create Shippo order:', e);
   }
-
-  // Note: Automatic label purchasing disabled - orders will appear in Shippo dashboard
-  // for manual label creation. To re-enable automatic labels, uncomment the section below.
-  console.log('✅ Order created in Shippo for manual label processing:', orderId);
 
   console.log(`Payment succeeded for order ${orderId}`);
 }

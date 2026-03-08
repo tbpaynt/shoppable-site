@@ -1,11 +1,5 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 interface Review {
   id: string;
@@ -16,6 +10,7 @@ interface Review {
   created_at: string;
   is_approved: boolean;
   is_verified_purchase: boolean;
+  reviewer_name?: string | null;
   products: {
     name: string;
   } | null;
@@ -69,20 +64,25 @@ export default function ReviewsPage() {
     setMessage('');
 
     try {
-      const { error } = await supabase
-        .from('product_reviews')
-        .insert([{
-          product_id: parseInt(formData.product_id),
-          user_id: '00000000-0000-0000-0000-000000000000', // Placeholder - would need user auth
+      const res = await fetch('/api/reviews/public', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: formData.product_id,
+          product_name: formData.product_name,
           rating: formData.rating,
-          title: formData.product_name,
           comment: formData.comment,
-          is_approved: false // Reviews need admin approval
-        }]);
+          customer_name: formData.customer_name || undefined,
+        }),
+      });
+      const data = await res.json();
 
-      if (error) throw error;
+      if (!res.ok) {
+        setMessage(data.error || 'Error submitting review. Please try again.');
+        return;
+      }
 
-      setMessage('Thank you for your review! It will be posted after approval.');
+      setMessage(data.message || 'Thank you for your review! It will be posted after approval.');
       setFormData({
         product_id: '',
         product_name: '',
@@ -140,23 +140,24 @@ export default function ReviewsPage() {
             <form onSubmit={handleSubmitReview} className="bg-gray-700 rounded-lg p-6 mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Product ID</label>
+                  <label className="block text-sm font-medium mb-2">Product ID <span className="text-gray-400 font-normal">(optional)</span></label>
                   <input
                     type="number"
+                    min={1}
                     value={formData.product_id}
                     onChange={(e) => setFormData({...formData, product_id: e.target.value})}
                     className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
-                    required
+                    placeholder="e.g. 1"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Product Name</label>
+                  <label className="block text-sm font-medium mb-2">Product Name <span className="text-gray-400 font-normal">(optional)</span></label>
                   <input
                     type="text"
                     value={formData.product_name}
                     onChange={(e) => setFormData({...formData, product_name: e.target.value})}
                     className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
-                    required
+                    placeholder="e.g. Apple Ipad"
                   />
                 </div>
               </div>
@@ -230,8 +231,8 @@ export default function ReviewsPage() {
               <div key={review.id} className="bg-gray-800 rounded-lg p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-blue-300">{review.products?.name || 'Product'}</h3>
-                    <p className="text-gray-400">Reviewed by {review.users?.email?.split('@')[0] || 'Customer'}***</p>
+                    <h3 className="text-lg font-semibold text-blue-300">{review.products?.name || 'General review'}</h3>
+                    <p className="text-gray-400">Reviewed by {review.reviewer_name || review.users?.email?.split('@')[0] || 'Customer'}***</p>
                     {review.is_verified_purchase && (
                       <span className="bg-green-600 text-white text-xs px-2 py-1 rounded mt-1 inline-block">
                         Verified Purchase

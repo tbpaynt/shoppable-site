@@ -103,7 +103,7 @@ export default function ProductListPage({}) {
     <div className="max-w-full min-h-screen" style={{background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'}}>
       {goLiveDate && countdown && (isBeforeGoLive || countdown.days > 0 || countdown.hours > 0 || countdown.minutes > 0 || countdown.seconds > 0) && (
         <div 
-          className="relative w-full min-h-screen flex flex-col justify-center items-center overflow-hidden" 
+          className="relative w-full min-h-screen flex flex-col justify-center items-center overflow-x-hidden overflow-y-auto" 
           style={{color: 'white'}}
           onMouseMove={handleMouseMove}
           onMouseEnter={() => setIsHovering(true)}
@@ -113,9 +113,9 @@ export default function ProductListPage({}) {
           onTouchEnd={() => setIsHovering(false)}
         >
           {/* Background Products Preview - Only visible through spotlight */}
-          <div className="absolute inset-0">
-            <div className="w-full min-h-screen flex flex-col items-center pt-16" style={{color: 'white'}}>
-              <h1 className="text-4xl font-extrabold mb-2 text-center">SNAG YOUR DEALS!</h1>
+          <div className="absolute inset-0 overflow-x-hidden">
+            <div className="w-full min-h-screen flex flex-col items-center pt-16 px-4 box-border" style={{color: 'white'}}>
+              <h1 className="text-3xl sm:text-4xl font-extrabold mb-2 text-center">SNAG YOUR DEALS!</h1>
               <div className="text-xl mb-8 text-center italic">or someone else will 😎</div>
               
               {/* Product Grid Preview */}
@@ -150,39 +150,39 @@ export default function ProductListPage({}) {
             }}
           />
           
-          {/* Countdown Content */}
-          <div className="relative z-10 w-full flex flex-col items-center pt-16">
-            <div className="w-full flex flex-col items-center pt-16">
-              <h2 className="text-4xl sm:text-6xl font-bold tracking-wide mb-8 text-center">SNAG A DEAL IN...</h2>
-              <div className="flex flex-row gap-8 mb-8">
-                <div className="flex flex-col items-center">
-                  <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.days).padStart(2, '0')}</span>
-                  <span className="text-lg tracking-widest mt-2">DAYS</span>
+          {/* Countdown Content - padded for mobile so nothing is cut off */}
+          <div className="relative z-10 w-full max-w-full flex flex-col items-center pt-16 px-4 sm:px-6 box-border">
+            <div className="w-full max-w-full flex flex-col items-center pt-8 sm:pt-16">
+              <h2 className="text-2xl sm:text-4xl md:text-6xl font-bold tracking-tight sm:tracking-wide mb-6 sm:mb-8 text-center px-1">SNAG A DEAL IN...</h2>
+              <div className="flex flex-row flex-wrap justify-center gap-3 sm:gap-4 md:gap-8 mb-6 sm:mb-8">
+                <div className="flex flex-col items-center min-w-[4rem] sm:min-w-0">
+                  <span className="text-3xl sm:text-5xl md:text-7xl font-extrabold tabular-nums">{String(countdown?.days).padStart(2, '0')}</span>
+                  <span className="text-xs sm:text-base md:text-lg tracking-wider sm:tracking-widest mt-1 sm:mt-2">DAYS</span>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.hours).padStart(2, '0')}</span>
-                  <span className="text-lg tracking-widest mt-2">HOURS</span>
+                <div className="flex flex-col items-center min-w-[4rem] sm:min-w-0">
+                  <span className="text-3xl sm:text-5xl md:text-7xl font-extrabold tabular-nums">{String(countdown?.hours).padStart(2, '0')}</span>
+                  <span className="text-xs sm:text-base md:text-lg tracking-wider sm:tracking-widest mt-1 sm:mt-2">HOURS</span>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.minutes).padStart(2, '0')}</span>
-                  <span className="text-lg tracking-widest mt-2">MINUTES</span>
+                <div className="flex flex-col items-center min-w-[4rem] sm:min-w-0">
+                  <span className="text-3xl sm:text-5xl md:text-7xl font-extrabold tabular-nums">{String(countdown?.minutes).padStart(2, '0')}</span>
+                  <span className="text-xs sm:text-base md:text-lg tracking-wider sm:tracking-widest mt-1 sm:mt-2">MINUTES</span>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-5xl sm:text-7xl font-extrabold">{String(countdown?.seconds).padStart(2, '0')}</span>
-                  <span className="text-lg tracking-widest mt-2">SECONDS</span>
+                <div className="flex flex-col items-center min-w-[4rem] sm:min-w-0">
+                  <span className="text-3xl sm:text-5xl md:text-7xl font-extrabold tabular-nums">{String(countdown?.seconds).padStart(2, '0')}</span>
+                  <span className="text-xs sm:text-base md:text-lg tracking-wider sm:tracking-widest mt-1 sm:mt-2">SECONDS</span>
                 </div>
               </div>
-              <h3 className="text-3xl sm:text-4xl font-bold mb-8 text-center">ARE YOU READY?</h3>
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-bold mb-6 sm:mb-8 text-center px-1">ARE YOU READY?</h3>
               {countdownMessage && (
-                <div className="text-2xl sm:text-3xl font-semibold mb-6 text-center max-w-4xl px-4">
+                <div className="text-lg sm:text-2xl md:text-3xl font-semibold mb-4 sm:mb-6 text-center max-w-4xl px-2 sm:px-4">
                   {countdownMessage}
                 </div>
               )}
-              <div className="text-xl sm:text-2xl tracking-widest font-mono mb-4">KTWHOLESALEFINDS.COM</div>
+              <div className="text-base sm:text-xl md:text-2xl tracking-widest font-mono mb-4 text-center px-2 break-all">KTWHOLESALEFINDS.COM</div>
               
               {/* Interactive Hint */}
-              <div className="mt-8 text-center">
-                <p className="text-lg mb-2 opacity-80">👆 Move your cursor or finger to peek at the deals!</p>
+              <div className="mt-6 sm:mt-8 text-center px-2">
+                <p className="text-sm sm:text-lg mb-2 opacity-80">👆 Move your cursor or finger to peek at the deals!</p>
                 <div className="w-16 h-1 bg-gradient-to-r from-transparent via-white to-transparent mx-auto animate-pulse"></div>
               </div>
             </div>
