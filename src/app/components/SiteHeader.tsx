@@ -7,12 +7,27 @@ export default function SiteHeader() {
       {/* Main Header */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="text-center">
-          {/* Logo/Brand Name */}
-          <Link href="/" className="inline-block">
-            <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-orange-400 via-orange-300 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(251,146,60,0.5)]">
+          {/* Logo/Brand Name — KTdealz.xyz @ KTWholesaleFinds */}
+          <h1
+            aria-label="KTdealz.xyz at KTWholesaleFinds"
+            className="mb-2 flex flex-wrap justify-center items-baseline gap-x-1.5 sm:gap-x-2 gap-y-1 px-2"
+          >
+            <a
+              href="https://ktdealz.xyz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs sm:text-sm md:text-base font-semibold bg-gradient-to-r from-orange-400 via-orange-300 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_6px_rgba(251,146,60,0.4)] hover:opacity-90 transition-opacity"
+            >
+              KTdealz.xyz
+            </a>
+            <span className="text-gray-500 font-normal text-xs sm:text-sm md:text-base select-none">@</span>
+            <Link
+              href="/"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-orange-400 via-orange-300 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(251,146,60,0.5)]"
+            >
               KTWholesaleFinds
-            </h1>
-          </Link>
+            </Link>
+          </h1>
           
           {/* Tagline */}
           <p className="text-lg md:text-xl text-blue-300 font-medium tracking-wider drop-shadow-[0_0_8px_rgba(147,197,253,0.4)]">
