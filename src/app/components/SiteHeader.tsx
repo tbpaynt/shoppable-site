@@ -9,17 +9,27 @@ export default function SiteHeader() {
         <div className="text-center">
           {/* Logo/Brand Name — KTdealz.xyz @ KTWholesaleFinds */}
           <h1
-            aria-label="KTdealz.xyz at KTWholesaleFinds"
+            aria-label="KTdealz.com and KTdealz.xyz at KTWholesaleFinds"
             className="mb-2 flex flex-wrap justify-center items-baseline gap-x-1.5 sm:gap-x-2 gap-y-1 px-2"
           >
-            <a
-              href="https://ktdealz.xyz"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs sm:text-sm md:text-base font-semibold bg-gradient-to-r from-orange-400 via-orange-300 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_6px_rgba(251,146,60,0.4)] hover:opacity-90 transition-opacity"
-            >
-              KTdealz.xyz
-            </a>
+            <div className="flex flex-col items-center gap-0.5">
+              <a
+                href="https://ktdealz.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs sm:text-sm md:text-base font-semibold bg-gradient-to-r from-orange-400 via-orange-300 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_6px_rgba(251,146,60,0.4)] hover:opacity-90 transition-opacity leading-tight"
+              >
+                KTdealz.com
+              </a>
+              <a
+                href="https://ktdealz.xyz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs sm:text-sm md:text-base font-semibold bg-gradient-to-r from-orange-400 via-orange-300 to-orange-500 bg-clip-text text-transparent drop-shadow-[0_0_6px_rgba(251,146,60,0.4)] hover:opacity-90 transition-opacity leading-tight"
+              >
+                KTdealz.xyz
+              </a>
+            </div>
             <span className="text-gray-500 font-normal text-xs sm:text-sm md:text-base select-none">@</span>
             <Link
               href="/"
