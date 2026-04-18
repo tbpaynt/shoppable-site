@@ -44,7 +44,7 @@ export default function SiteHeader() {
 
           {/* Tagline */}
           <p className="text-lg md:text-xl text-blue-300 font-medium tracking-wider drop-shadow-[0_0_8px_rgba(147,197,253,0.4)] text-center">
-            Where Your Dream Deals Come To Life!
+            Same Quality - Unbeatable Prices
           </p>
           
           {/* Decorative Elements */}
