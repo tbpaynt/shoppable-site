@@ -227,7 +227,7 @@ export default function HomePage() {
         <div className="bg-green-600 text-white text-center py-2 px-4 relative">
           <div className="flex items-center justify-center">
             <span className="text-sm font-medium">
-              🚚 FREE SHIPPING on orders $150 or more! 🎉
+              🚚 FREE SHIPPING on orders $99 or more! 🎉
             </span>
             <button
               onClick={() => setShowFreeShippingBanner(false)}

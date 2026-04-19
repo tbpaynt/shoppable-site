@@ -13,6 +13,13 @@ export default function ShippingPage() {
             </p>
           </div>
 
+          {/* Shipping rates */}
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h2 className="text-2xl font-semibold mb-4">Shipping Rates</h2>
+            <p className="text-gray-300">
+              Orders of $99 or more qualify for free standard shipping within the United States. Orders below $99 are charged a flat shipping rate at checkout (your cart shows the exact amount once your address is entered).
+            </p>
+          </div>
 
           {/* Tracking Information */}
           <div className="bg-gray-800 p-6 rounded-lg">

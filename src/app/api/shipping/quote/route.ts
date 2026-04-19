@@ -49,20 +49,20 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Shipping Quote] Order value: $${totalOrderValue}, Items: ${items.length}`);
 
-    // Free shipping on orders $150+
-    if (totalOrderValue >= 150) {
-      console.log(`[Shipping Quote] Free shipping applied (order >= $150)`);
+    // Free shipping on orders $99+
+    if (totalOrderValue >= 99) {
+      console.log(`[Shipping Quote] Free shipping applied (order >= $99)`);
       return NextResponse.json({
         rateId: "free_shipping",
         provider: "Free Shipping",
-        service: "Free Shipping on Orders $150+",
+        service: "Free Shipping on Orders $99+",
         amount: 0,
         currency: "USD"
       });
     }
 
-    // Flat rate shipping of $16.95 for orders under $150
-    console.log(`[Shipping Quote] Flat rate shipping: $16.95 (order < $150)`);
+    // Flat rate shipping of $16.95 for orders under $99
+    console.log(`[Shipping Quote] Flat rate shipping: $16.95 (order < $99)`);
     return NextResponse.json({
       rateId: "flat_rate_shipping",
       provider: "Standard Shipping",

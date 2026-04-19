@@ -136,11 +136,11 @@ export default function CartPage() {
   const productTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   
   // Free shipping threshold
-  const FREE_SHIPPING_THRESHOLD = 150;
+  const FREE_SHIPPING_THRESHOLD = 99;
   const isEligibleForFreeShipping = productTotal >= FREE_SHIPPING_THRESHOLD;
   const amountNeededForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - productTotal);
   
-  // Use dynamic quote if available, otherwise use flat rate as default for orders under $150
+  // Use dynamic quote if available, otherwise use flat rate as default for orders under $99
   // Only fall back to per-item shipping if quote hasn't been fetched yet and address isn't provided
   const hasAddress = address.name && address.street1 && address.city && address.state && address.zip;
   const shippingTotal = shippingQuote !== null 

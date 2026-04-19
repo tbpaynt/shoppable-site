@@ -17,7 +17,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How long does shipping take?",
-    answer: "Standard shipping takes 5-7 business days, express shipping takes 2-3 business days, and overnight shipping delivers the next business day. Orders over $50 qualify for free standard shipping."
+    answer: "Standard shipping takes 5-7 business days, express shipping takes 2-3 business days, and overnight shipping delivers the next business day. Orders of $99 or more qualify for free standard shipping."
   },
   {
     question: "How do I track my order?",
