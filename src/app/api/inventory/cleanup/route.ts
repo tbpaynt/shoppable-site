@@ -6,6 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const CHECKOUT_CONTEXT_RETENTION_DAYS = 45;
+
 export async function POST() {
   try {
     console.log('🧹 Manual cleanup of expired inventory reservations triggered');
@@ -33,10 +35,60 @@ export async function POST() {
     console.log(`✅ Cleaned up ${cleanedCount} expired reservations`);
     console.log('📦 Freed inventory:', freedInventory);
 
+    // Clean up old checkout contexts that already have a persisted order.
+    // This keeps the helper table small without risking active checkout flows.
+    const checkoutCutoff = new Date(Date.now() - CHECKOUT_CONTEXT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const { data: oldContexts, error: oldContextsError } = await supabase
+      .from('checkout_contexts')
+      .select('order_id')
+      .lt('created_at', checkoutCutoff.toISOString());
+
+    if (oldContextsError) {
+      console.error('Error finding old checkout contexts:', oldContextsError);
+      return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
+    }
+
+    const oldOrderIds = (oldContexts || []).map((ctx: { order_id: string }) => ctx.order_id);
+    let cleanedCheckoutContexts = 0;
+
+    if (oldOrderIds.length > 0) {
+      const { data: existingOrders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id')
+        .in('id', oldOrderIds);
+
+      if (ordersError) {
+        console.error('Error checking existing orders for checkout context cleanup:', ordersError);
+        return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
+      }
+
+      const existingOrderIds = (existingOrders || []).map((order: { id: string }) => order.id);
+
+      if (existingOrderIds.length > 0) {
+        const { data: deletedCheckoutContexts, error: deleteCheckoutContextsError } = await supabase
+          .from('checkout_contexts')
+          .delete()
+          .in('order_id', existingOrderIds)
+          .lt('created_at', checkoutCutoff.toISOString())
+          .select('order_id');
+
+        if (deleteCheckoutContextsError) {
+          console.error('Error deleting old checkout contexts:', deleteCheckoutContextsError);
+          return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
+        }
+
+        cleanedCheckoutContexts = deletedCheckoutContexts?.length || 0;
+      }
+    }
+
+    console.log(`✅ Cleaned up ${cleanedCheckoutContexts} old checkout contexts`);
+
     return NextResponse.json({
       success: true,
       cleanedReservations: cleanedCount,
-      freedInventory
+      freedInventory,
+      cleanedCheckoutContexts,
+      checkoutContextRetentionDays: CHECKOUT_CONTEXT_RETENTION_DAYS,
     });
   } catch (error) {
     console.error('Cleanup API error:', error);
@@ -73,9 +125,41 @@ export async function GET() {
       return acc;
     }, {}) || {};
 
+    // Preview checkout context cleanup workload
+    const checkoutCutoff = new Date(Date.now() - CHECKOUT_CONTEXT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const { data: oldContexts, error: oldContextsError } = await supabase
+      .from('checkout_contexts')
+      .select('order_id')
+      .lt('created_at', checkoutCutoff.toISOString());
+
+    if (oldContextsError) {
+      return NextResponse.json({ error: 'Failed to fetch checkout context status' }, { status: 500 });
+    }
+
+    const oldOrderIds = (oldContexts || []).map((ctx: { order_id: string }) => ctx.order_id);
+    let readyToDeleteCheckoutContexts = 0;
+
+    if (oldOrderIds.length > 0) {
+      const { data: existingOrders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id')
+        .in('id', oldOrderIds);
+
+      if (ordersError) {
+        return NextResponse.json({ error: 'Failed to fetch checkout context status' }, { status: 500 });
+      }
+
+      readyToDeleteCheckoutContexts = existingOrders?.length || 0;
+    }
+
     return NextResponse.json({
       totalActiveReservations: reservations?.length || 0,
-      reservationsByProduct
+      reservationsByProduct,
+      checkoutContextCleanup: {
+        retentionDays: CHECKOUT_CONTEXT_RETENTION_DAYS,
+        olderThanRetention: oldOrderIds.length,
+        readyToDelete: readyToDeleteCheckoutContexts,
+      },
     });
   } catch (error) {
     console.error('Reservations status API error:', error);

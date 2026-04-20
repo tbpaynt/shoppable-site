@@ -369,6 +369,19 @@ export async function POST(request: NextRequest) {
     const stripe = getStripeServer();
 
     const orderId = uuidv4();
+    const { error: checkoutContextError } = await supabase
+      .from("checkout_contexts")
+      .insert({
+        order_id: orderId,
+        reservation_group_id: reservationId,
+        user_email: session.user.email,
+        address_to: addressTo || null,
+      });
+
+    if (checkoutContextError) {
+      console.error("Failed to save checkout context:", checkoutContextError);
+      return NextResponse.json({ error: "Failed to initialize checkout" }, { status: 500 });
+    }
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: totalInCents,
@@ -378,18 +391,10 @@ export async function POST(request: NextRequest) {
         orderId,
         userEmail: session.user.email,
         reservationId, // Include reservation ID for cleanup
-        items: JSON.stringify(
-          items.map((i) => ({
-            id: i.id,
-            name: productMap.get(i.id)!.name,
-            price: productMap.get(i.id)!.price,
-            shipping_cost: productMap.get(i.id)!.shipping_cost || 0,
-            quantity: i.quantity,
-          }))
-        ),
+        // Do not include cart items in Stripe metadata (500-char max per value).
+        // Webhook reconstructs line items from reservationId instead.
         ...(rateId ? { shippo_rate_id: rateId } : {}),
         ...(shipAmount ? { ship_cost: shipAmount } : {}),
-        ...(addressTo ? { address_to: JSON.stringify(addressTo) } : {}),
         ...(taxAmount ? { tax_amount: taxAmount } : {}),
       },
       automatic_payment_methods: { enabled: true },

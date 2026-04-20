@@ -93,7 +93,7 @@ export default function AdminPage() {
   const [categoryLoading, setCategoryLoading] = useState(false);
 
   // Admin panel view management
-  type AdminView = 'products' | 'orders' | 'bulk-import' | 'customers' | 'reviews' | 'categories';
+  type AdminView = 'products' | 'orders' | 'bulk-import' | 'customers' | 'reviews' | 'categories' | 'maintenance';
   const [view, setView] = useState<AdminView>('products');
 
   // Orders state
@@ -152,6 +152,19 @@ export default function AdminPage() {
   const [bulkImportLoading, setBulkImportLoading] = useState(false);
   const [bulkProducts, setBulkProducts] = useState<Array<Omit<Product, 'id'> & { category_id?: number; temp_id: string }>>([]);
   const [bulkProductImages, setBulkProductImages] = useState<{ [key: string]: File | null }>({});
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<{
+    cleanedReservations?: number;
+    cleanedCheckoutContexts?: number;
+    checkoutContextRetentionDays?: number;
+    totalActiveReservations?: number;
+    checkoutContextCleanup?: {
+      retentionDays: number;
+      olderThanRetention: number;
+      readyToDelete: number;
+    };
+  } | null>(null);
+  const [cleanupToast, setCleanupToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Handle email/password login
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -484,6 +497,58 @@ export default function AdminPage() {
     };
     fetchReviews();
   }, [view]);
+
+  // Fetch cleanup status whenever maintenance view is selected
+  useEffect(() => {
+    if (view !== 'maintenance') return;
+    const fetchCleanupStatus = async () => {
+      setCleanupLoading(true);
+      try {
+        const res = await fetch('/api/inventory/cleanup');
+        const data = await res.json();
+        if (res.ok) {
+          setCleanupResult(data);
+        }
+      } catch (e) {
+        console.error('Error fetching cleanup status', e);
+      } finally {
+        setCleanupLoading(false);
+      }
+    };
+    fetchCleanupStatus();
+  }, [view]);
+
+  const handleRunCleanup = async () => {
+    setCleanupLoading(true);
+    setCleanupToast(null);
+    try {
+      const res = await fetch('/api/inventory/cleanup', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setCleanupResult(data);
+        const reservationsCleaned = data?.cleanedReservations ?? 0;
+        const contextsCleaned = data?.cleanedCheckoutContexts ?? 0;
+        setCleanupToast({
+          type: 'success',
+          message: `Cleanup complete. Removed ${reservationsCleaned} reservations and ${contextsCleaned} checkout contexts.`,
+        });
+      } else {
+        setCleanupToast({
+          type: 'error',
+          message: data?.error || 'Cleanup failed',
+        });
+      }
+    } catch (e) {
+      console.error('Error running cleanup', e);
+      setCleanupToast({
+        type: 'error',
+        message: 'Cleanup failed',
+      });
+    } finally {
+      setCleanupLoading(false);
+      setTimeout(() => setCleanupToast(null), 5000);
+    }
+  };
 
   const handleReviewApproval = async (reviewId: string, isApproved: boolean) => {
     try {
@@ -1221,6 +1286,7 @@ export default function AdminPage() {
             <option value="customers" className="text-white bg-gray-700">Customers</option>
             <option value="reviews" className="text-white bg-gray-700">Reviews</option>
             <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
+            <option value="maintenance" className="text-white bg-gray-700">Maintenance</option>
           </select>
         </div>
 
@@ -1367,6 +1433,7 @@ export default function AdminPage() {
             <option value="customers" className="text-white bg-gray-700">Customers</option>
             <option value="reviews" className="text-white bg-gray-700">Reviews</option>
             <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
+            <option value="maintenance" className="text-white bg-gray-700">Maintenance</option>
           </select>
         </div>
 
@@ -1426,6 +1493,7 @@ export default function AdminPage() {
             <option value="customers" className="text-white bg-gray-700">Customers</option>
             <option value="reviews" className="text-white bg-gray-700">Reviews</option>
             <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
+            <option value="maintenance" className="text-white bg-gray-700">Maintenance</option>
           </select>
         </div>
 
@@ -1734,6 +1802,71 @@ export default function AdminPage() {
     );
   }
 
+  // Render MAINTENANCE view
+  if (view === 'maintenance') {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8">
+        <h1 className="text-3xl font-bold mb-6">Admin Dashboard - Maintenance</h1>
+        <div className="mb-6">
+          <label className="mr-2 font-semibold text-white">Select view:</label>
+          <select
+            value={view}
+            onChange={(e) => setView(e.target.value as AdminView)}
+            className="p-2 rounded text-white bg-gray-700 border border-gray-600"
+          >
+            <option value="products" className="text-white bg-gray-700">Products</option>
+            <option value="categories" className="text-white bg-gray-700">Categories</option>
+            <option value="orders" className="text-white bg-gray-700">Orders</option>
+            <option value="customers" className="text-white bg-gray-700">Customers</option>
+            <option value="reviews" className="text-white bg-gray-700">Reviews</option>
+            <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
+            <option value="maintenance" className="text-white bg-gray-700">Maintenance</option>
+          </select>
+        </div>
+
+        <div className="bg-gray-800 p-6 rounded-lg max-w-3xl">
+          <h2 className="text-xl font-bold mb-2">Cleanup Tools</h2>
+          <p className="text-gray-300 mb-4">
+            Runs reservation cleanup and removes old checkout contexts that already have matching orders.
+          </p>
+
+          {cleanupToast && (
+            <div
+              className={`mb-4 rounded border px-4 py-3 text-sm ${
+                cleanupToast.type === 'success'
+                  ? 'bg-green-900/40 border-green-600 text-green-200'
+                  : 'bg-red-900/40 border-red-600 text-red-200'
+              }`}
+            >
+              {cleanupToast.message}
+            </div>
+          )}
+
+          <div className="flex gap-3 mb-6">
+            <button
+              onClick={handleRunCleanup}
+              disabled={cleanupLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded"
+            >
+              {cleanupLoading ? 'Running Cleanup...' : 'Run Cleanup Now'}
+            </button>
+          </div>
+
+          {cleanupResult && (
+            <div className="space-y-2 text-sm bg-gray-900 border border-gray-700 rounded p-4">
+              <div>Total Active Reservations: <strong>{cleanupResult.totalActiveReservations ?? 'n/a'}</strong></div>
+              <div>Reservations Cleaned (last run): <strong>{cleanupResult.cleanedReservations ?? 0}</strong></div>
+              <div>Checkout Contexts Cleaned (last run): <strong>{cleanupResult.cleanedCheckoutContexts ?? 0}</strong></div>
+              <div>Checkout Context Retention (days): <strong>{cleanupResult.checkoutContextRetentionDays ?? cleanupResult.checkoutContextCleanup?.retentionDays ?? 'n/a'}</strong></div>
+              <div>Old Checkout Contexts: <strong>{cleanupResult.checkoutContextCleanup?.olderThanRetention ?? 'n/a'}</strong></div>
+              <div>Ready To Delete: <strong>{cleanupResult.checkoutContextCleanup?.readyToDelete ?? 'n/a'}</strong></div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
@@ -1752,6 +1885,7 @@ export default function AdminPage() {
           <option value="customers" className="text-white bg-gray-700">Customers</option>
           <option value="reviews" className="text-white bg-gray-700">Reviews</option>
           <option value="bulk-import" className="text-white bg-gray-700">Bulk Import</option>
+          <option value="maintenance" className="text-white bg-gray-700">Maintenance</option>
         </select>
       </div>
 

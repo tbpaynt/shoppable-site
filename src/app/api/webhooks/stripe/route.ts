@@ -21,6 +21,16 @@ interface OrderItem {
   price: number;
 }
 
+interface OrderItemFromMetadata {
+  id: number;
+  quantity: number;
+}
+
+interface OrderItemRef {
+  id: number;
+  quantity: number;
+}
+
 /** Normalize address for comparison (same customer, same address = combinable) */
 function normalizeAddressKey(addr: { street1?: string; city?: string; state?: string; zip?: string } | null): string {
   if (!addr) return '';
@@ -77,15 +87,96 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     reservationId,
   } = paymentIntent.metadata as any;
   
-  console.log('🔥 WEBHOOK: Parsed metadata:', { orderId, userEmail, items: !!items, address_to: !!address_to });
+  console.log('🔥 WEBHOOK: Parsed metadata:', { orderId, userEmail, items: !!items, reservationId: !!reservationId });
   
-  if (!userEmail || !items || !orderId) {
+  if (!userEmail || !orderId) {
     console.error('❌ WEBHOOK: Missing required metadata in payment intent');
     return;
   }
-  
-  // Parse items from metadata
-  const orderItems: OrderItem[] = JSON.parse(items);
+
+  let orderItemRefs: OrderItemRef[] = [];
+
+  if (reservationId) {
+    // Preferred source: inventory reservation rows are not size-limited like Stripe metadata.
+    const { data: reservationRows, error: reservationErr } = await supabase
+      .from('inventory_reservations')
+      .select('product_id, quantity')
+      .eq('reservation_group_id', reservationId);
+
+    if (reservationErr) {
+      console.error('Error loading reservation items', reservationErr);
+      throw new Error('Failed to load reservation items');
+    }
+
+    orderItemRefs = (reservationRows || [])
+      .map((row: { product_id: number; quantity: number }) => ({
+        id: Number(row.product_id),
+        quantity: Number(row.quantity),
+      }))
+      .filter((it) => Number.isFinite(it.id) && it.id > 0 && Number.isFinite(it.quantity) && it.quantity > 0);
+  }
+
+  // Backward compatibility for older intents that still pass metadata.items
+  if (orderItemRefs.length === 0 && items) {
+    const rawItems = JSON.parse(items) as OrderItemFromMetadata[];
+    orderItemRefs = (rawItems || [])
+      .map((it) => ({ id: Number(it.id), quantity: Number(it.quantity) }))
+      .filter((it) => Number.isFinite(it.id) && it.id > 0 && Number.isFinite(it.quantity) && it.quantity > 0);
+  }
+
+  if (orderItemRefs.length === 0) {
+    console.error('❌ WEBHOOK: No valid order items found from reservationId or metadata');
+    return;
+  }
+
+  const uniqueProductIds = [...new Set(orderItemRefs.map((it) => it.id))];
+  const { data: productsData, error: productsErr } = await supabase
+    .from('products')
+    .select('id, name, price, stock, weight_oz')
+    .in('id', uniqueProductIds);
+
+  if (productsErr) {
+    console.error('Error fetching products data', productsErr);
+    throw new Error('Failed to fetch product data');
+  }
+
+  const productMap = new Map<number, { name: string; price: number; stock: number | null; weight_oz: number | null }>();
+  (productsData || []).forEach((p: { id: number; name: string; price: number; stock: number | null; weight_oz: number | null }) =>
+    productMap.set(p.id, { name: p.name, price: p.price, stock: p.stock, weight_oz: p.weight_oz })
+  );
+
+  const orderItems: OrderItem[] = orderItemRefs.map((item) => {
+    const product = productMap.get(item.id);
+    if (!product) {
+      throw new Error(`Product ${item.id} not found for order`);
+    }
+    return {
+      id: item.id,
+      quantity: item.quantity,
+      name: product.name,
+      price: product.price,
+    };
+  });
+
+  const { data: checkoutContext, error: checkoutContextErr } = await supabase
+    .from('checkout_contexts')
+    .select('address_to')
+    .eq('order_id', orderId)
+    .maybeSingle();
+
+  if (checkoutContextErr) {
+    console.error('Error loading checkout context', checkoutContextErr);
+  }
+
+  let metadataAddress: unknown = null;
+  if (address_to) {
+    try {
+      metadataAddress = JSON.parse(address_to);
+    } catch {
+      metadataAddress = null;
+    }
+  }
+  const resolvedAddress = checkoutContext?.address_to ?? metadataAddress ?? null;
   
   // Insert order record
   const { error: orderErr } = await supabase
@@ -97,7 +188,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
       ship_cost: ship_cost ? Number(ship_cost) : null,
       tax_amount: tax_amount ? Number(tax_amount) : null,
       status: 'paid',
-      address_to: address_to ? JSON.parse(address_to) : null,
+      address_to: resolvedAddress,
     });
   if (orderErr) {
     console.error('Insert order error', orderErr);
@@ -118,21 +209,6 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
 
   if (itemsError) throw itemsError;
 
-  // **CRITICAL: Final stock validation before processing**
-  // Fetch all needed product info in a single query (stock + weight)
-  const { data: productsData, error: productsErr } = await supabase
-    .from('products')
-    .select('id, stock, weight_oz')
-    .in('id', orderItems.map((it) => it.id));
-
-  if (productsErr) {
-    console.error('Error fetching products data', productsErr);
-    throw new Error('Failed to fetch product data');
-  }
-
-  const productMap = new Map<number, { stock: number | null; weight_oz: number | null }>();
-  (productsData || []).forEach((p) => productMap.set(p.id, { stock: p.stock, weight_oz: p.weight_oz }));
-  
   // Final stock validation - reject payment if insufficient stock
   for (const item of orderItems) {
     const prodInfo = productMap.get(item.id);
@@ -176,7 +252,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
   }
 
   // Create Shippo order (single or combined with other recent orders to same address)
-  const parsedAddress = address_to ? JSON.parse(address_to) as { name?: string; street1: string; city: string; state: string; zip: string; country?: string } : null;
+  const parsedAddress = resolvedAddress as { name?: string; street1: string; city: string; state: string; zip: string; country?: string } | null;
   try {
     if (!parsedAddress) {
       console.log('❌ WEBHOOK: No address_to provided, skipping Shippo order creation');
